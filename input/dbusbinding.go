@@ -179,8 +179,8 @@ func BindDbus(tr *desktop.Tracker) {
 		go export(tr)
 	}
 
-	// Bind event channel
-	go event(tr.Channels.Event, tr)
+	// Subscribe to tracker events
+	desktop.OnEvent(func(e string) { dispatchEvent(e, tr) })
 
 	// Attach execute events
 	OnExecute(func(action string, desktop uint, screen uint) {
@@ -205,18 +205,16 @@ func BindDbus(tr *desktop.Tracker) {
 	})
 }
 
-func event(ch chan string, tr *desktop.Tracker) {
-	for {
-		switch <-ch {
-		case "clients_change":
-			SetProperty("Clients", common.Map{"Values": maps.Values(tr.Clients)})
-		case "workspaces_change":
-			SetProperty("Workspaces", common.Map{"Values": maps.Values(tr.Workspaces)})
-		case "workplace_change":
-			SetProperty("Workplace", *store.Workplace)
-		case "windows_change":
-			SetProperty("Windows", *store.Windows)
-		}
+func dispatchEvent(name string, tr *desktop.Tracker) {
+	switch name {
+	case "clients_change":
+		SetProperty("Clients", common.Map{"Values": maps.Values(tr.Clients)})
+	case "workspaces_change":
+		SetProperty("Workspaces", common.Map{"Values": maps.Values(tr.Workspaces)})
+	case "workplace_change":
+		SetProperty("Workplace", *store.Workplace)
+	case "windows_change":
+		SetProperty("Windows", *store.Windows)
 	}
 }
 

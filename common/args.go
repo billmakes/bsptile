@@ -17,6 +17,7 @@ type Arguments struct {
 	Config string   // Argument for config file path
 	Lock   string   // Argument for lock file path
 	Log    string   // Argument for log file path
+	Socket string   // Argument for control socket path
 	VVV    bool     // Argument for very very verbose mode
 	VV     bool     // Argument for very verbose mode
 	V      bool     // Argument for verbose mode
@@ -36,6 +37,7 @@ func InitArgs(introspect map[string][]string) {
 	flag.StringVar(&Args.Config, "config", filepath.Join(ConfigFolderPath(Build.Name), "config.toml"), "config file path")
 	flag.StringVar(&Args.Lock, "lock", filepath.Join(os.TempDir(), fmt.Sprintf("%s.lock", Build.Name)), "lock file path")
 	flag.StringVar(&Args.Log, "log", filepath.Join(os.TempDir(), fmt.Sprintf("%s.log", Build.Name)), "log file path")
+	flag.StringVar(&Args.Socket, "socket", "", "control socket path (default: $BSPTILE_SOCKET or $XDG_RUNTIME_DIR/bsptile-<display>.sock)")
 	flag.BoolVar(&Args.VVV, "vvv", false, "very very verbose mode")
 	flag.BoolVar(&Args.VV, "vv", false, "very verbose mode")
 	flag.BoolVar(&Args.V, "v", false, "verbose mode")

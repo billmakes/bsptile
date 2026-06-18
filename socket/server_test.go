@@ -1,0 +1,157 @@
+package socket
+
+import (
+	"bufio"
+	"encoding/json"
+	"net"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/billmakes/bsptile/v2/socket/proto"
+)
+
+func TestServerHandleRejectsUnknownCommand(t *testing.T) {
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	resp := sendRequest(t, srv.Path, proto.Request{Cmd: "bogus"})
+	if resp.OK {
+		t.Fatal("expected ok=false for unknown command")
+	}
+	if !strings.Contains(resp.Error, "unknown command") {
+		t.Fatalf("error = %q, want unknown-command message", resp.Error)
+	}
+}
+
+func TestServerHandleRejectsInvalidJSON(t *testing.T) {
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	conn, err := net.Dial("unix", srv.Path)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close()
+	conn.Write([]byte("not json\n"))
+
+	conn.SetReadDeadline(time.Now().Add(time.Second))
+	line, err := bufio.NewReader(conn).ReadString('\n')
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	var resp proto.Response
+	if err := json.Unmarshal([]byte(line), &resp); err != nil {
+		t.Fatalf("decode: %v (line=%q)", err, line)
+	}
+	if resp.OK {
+		t.Fatal("expected ok=false for invalid JSON")
+	}
+	if !strings.Contains(resp.Error, "invalid request") {
+		t.Fatalf("error = %q, want invalid-request message", resp.Error)
+	}
+}
+
+func TestServerSubscribeAcksThenStreamsEvents(t *testing.T) {
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	conn, err := net.Dial("unix", srv.Path)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close()
+
+	if err := json.NewEncoder(conn).Encode(proto.Request{
+		Cmd:    proto.CmdSubscribe,
+		Topics: []string{proto.TopicAction},
+	}); err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+
+	reader := bufio.NewReader(conn)
+	conn.SetReadDeadline(time.Now().Add(time.Second))
+
+	// First line: subscribe ack.
+	ackLine, err := reader.ReadString('\n')
+	if err != nil {
+		t.Fatalf("read ack: %v", err)
+	}
+	var ack proto.Response
+	json.Unmarshal([]byte(ackLine), &ack)
+	if !ack.OK {
+		t.Fatalf("subscribe ack not ok: %s", ackLine)
+	}
+
+	// Give the server time to register the subscription before publishing.
+	waitForSubscriber(t, srv, time.Second)
+
+	srv.subs.Publish(proto.TopicAction, map[string]string{"name": "balance"})
+
+	conn.SetReadDeadline(time.Now().Add(time.Second))
+	evLine, err := reader.ReadString('\n')
+	if err != nil {
+		t.Fatalf("read event: %v", err)
+	}
+	var ev proto.Event
+	if err := json.Unmarshal([]byte(evLine), &ev); err != nil {
+		t.Fatalf("decode event: %v (line=%q)", err, evLine)
+	}
+	if ev.Event != proto.TopicAction {
+		t.Fatalf("event = %q, want %q", ev.Event, proto.TopicAction)
+	}
+}
+
+// newTestServer starts a Server bound to a tempdir socket with no tracker.
+// Bypasses Init() so tests don't depend on input/desktop/store globals.
+func newTestServer(t *testing.T) *Server {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "bsptile.sock")
+	l, err := net.Listen("unix", path)
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	srv := &Server{Path: path, listener: l, subs: NewSubscribers()}
+	go srv.accept()
+	return srv
+}
+
+func sendRequest(t *testing.T, path string, req proto.Request) proto.Response {
+	t.Helper()
+	conn, err := net.Dial("unix", path)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close()
+
+	if err := json.NewEncoder(conn).Encode(req); err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+
+	conn.SetReadDeadline(time.Now().Add(time.Second))
+	line, err := bufio.NewReader(conn).ReadString('\n')
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	var resp proto.Response
+	if err := json.Unmarshal([]byte(line), &resp); err != nil {
+		t.Fatalf("decode: %v (line=%q)", err, line)
+	}
+	return resp
+}
+
+func waitForSubscriber(t *testing.T, srv *Server, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		srv.subs.mu.Lock()
+		n := len(srv.subs.conns)
+		srv.subs.mu.Unlock()
+		if n > 0 {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("timed out waiting for subscriber to register")
+}

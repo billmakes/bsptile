@@ -1,4 +1,5 @@
 BINARY  = bsptile
+CTL     = bsptilectl
 VERSION = $(shell git describe --tags --always --dirty 2>/dev/null || echo "0.0.0")
 COMMIT  = $(shell git rev-parse --short HEAD 2>/dev/null || echo "local")
 DATE    = $(shell date --iso-8601=seconds)
@@ -11,15 +12,21 @@ LDFLAGS = -s -w \
 	-X main.commit=$(COMMIT) \
 	-X main.date=$(DATE)
 
-.PHONY: build install clean
+.PHONY: build build-daemon build-ctl install clean
 
-build:
+build: build-daemon build-ctl
+
+build-daemon:
 	go build -ldflags "$(LDFLAGS)" -o $(BINARY) .
+
+build-ctl:
+	go build -ldflags "$(LDFLAGS)" -o $(CTL) ./cmd/bsptilectl
 
 PREFIX  = $(HOME)/.local
 
 install: build
 	install -Dm755 $(BINARY) $(PREFIX)/bin/$(BINARY)
+	install -Dm755 $(CTL) $(PREFIX)/bin/$(CTL)
 
 clean:
-	rm -f $(BINARY)
+	rm -f $(BINARY) $(CTL)

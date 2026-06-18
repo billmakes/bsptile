@@ -28,6 +28,22 @@ type Channels struct {
 	Action chan string // Channel for actions
 }
 
+var (
+	eventCallbacksFun []func(string) // Channel event callback functions
+)
+
+func OnEvent(fun func(string)) {
+	eventCallbacksFun = append(eventCallbacksFun, fun)
+}
+
+func (tr *Tracker) DispatchEvents() {
+	for event := range tr.Channels.Event {
+		for _, fun := range eventCallbacksFun {
+			fun(event)
+		}
+	}
+}
+
 type Handlers struct {
 	Timer        *time.Timer // Timer to handle delayed structure events
 	ResizeClient *Handler    // Stores client for proportion change

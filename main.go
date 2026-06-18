@@ -15,6 +15,7 @@ import (
 	"github.com/billmakes/bsptile/v2/common"
 	"github.com/billmakes/bsptile/v2/desktop"
 	"github.com/billmakes/bsptile/v2/input"
+	"github.com/billmakes/bsptile/v2/socket"
 	"github.com/billmakes/bsptile/v2/store"
 	"github.com/billmakes/bsptile/v2/ui"
 
@@ -117,7 +118,21 @@ func runMain() {
 
 	// Create tracker instance
 	tr := desktop.CreateTracker()
+
+	// Start tracker event dispatcher before any senders. Bind() and the
+	// mouse poll loop can publish events as soon as they start, and the
+	// channel is unbuffered, so we need a drain in place first.
+	go tr.DispatchEvents()
+
 	input.Bind(tr)
+
+	// Start control socket (unless explicitly disabled)
+	if !common.HasFlag("disable-socket-interface") {
+		if _, err := socket.Init(tr); err != nil {
+			log.Warn("Error starting control socket: ", err)
+		}
+	}
+
 	tr.Update()
 
 	// Show layout overlay
