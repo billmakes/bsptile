@@ -216,19 +216,6 @@ func event(ch chan string, tr *desktop.Tracker) {
 			SetProperty("Workplace", *store.Workplace)
 		case "windows_change":
 			SetProperty("Windows", *store.Windows)
-		case "corner_change":
-			for _, hc := range store.Workplace.Displays.Corners {
-				if !hc.Active {
-					continue
-				}
-				SetProperty("Corner", struct {
-					Name     string
-					Location store.Location
-				}{
-					Name:     hc.Name,
-					Location: tr.ActiveWorkspace().Location,
-				})
-			}
 		}
 	}
 }
@@ -273,7 +260,6 @@ func export(tr *desktop.Tracker) {
 		"Clients":       common.Map{},
 		"Pointer":       common.Map{},
 		"Action":        common.Map{},
-		"Corner":        common.Map{},
 		"Disconnect":    common.Map{},
 	}
 	properties := map[string]*prop.Prop{}

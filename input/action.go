@@ -677,7 +677,6 @@ func ReloadConfig(tr *desktop.Tracker) bool {
 
 	ReloadKeys(tr)
 	ReloadMouseBindings(tr)
-	store.ReloadCorners()
 
 	for _, ws := range tr.Workspaces {
 		for _, layout := range ws.Layouts {

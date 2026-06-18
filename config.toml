@@ -74,12 +74,6 @@ edge_margin = [0, 0, 0, 0]
 # Margin of the tiling area on primary screen ([top, right, bottom, left]).
 edge_margin_primary = [0, 0, 0, 0]
 
-# Width and height of a hot-corner area within the edge corners (0 - 100).
-edge_corner_size = 10
-
-# Width or height of a hot-corner area within the edge centers (0 - 100).
-edge_center_size = 100
-
 # Outline thickness in pixels of the drop-target indicator shown while dragging.
 drop_target_width = 4
 
@@ -232,34 +226,6 @@ proportion_left = ["Mod4-h", "Mod4-Left"]
 proportion_down = ["Mod4-j", "Mod4-Down"]
 proportion_up = ["Mod4-k", "Mod4-Up"]
 proportion_right = ["Mod4-l", "Mod4-Right"]
-
-################################################################################
-[corners]                                # Action strings from [keys] section. #
-################################################################################
-
-# Corner at top left.
-top_left = "window_previous"
-
-# Corner at top center.
-top_center = ""
-
-# Corner at top right.
-top_right = "window_next"
-
-# Corner at center right.
-center_right = ""
-
-# Corner at bottom right.
-bottom_right = "proportion_increase"
-
-# Corner at bottom center.
-bottom_center = ""
-
-# Corner at bottom left.
-bottom_left = "proportion_decrease"
-
-# Corner at center left.
-center_left = ""
 
 ################################################################################
 [systray]                                # Action strings from [keys] section. #

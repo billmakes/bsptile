@@ -32,14 +32,11 @@ type Configuration struct {
 	ProportionMin       float64                `toml:"proportion_min"`        // BSP split ratio minimum
 	EdgeMargin          []int                  `toml:"edge_margin"`           // Margin values of tiling area
 	EdgeMarginPrimary   []int                  `toml:"edge_margin_primary"`   // Margin values of primary tiling area
-	EdgeCornerSize      int                    `toml:"edge_corner_size"`      // Size of square defining edge corners
-	EdgeCenterSize      int                    `toml:"edge_center_size"`      // Length of rectangle defining edge centers
 	DropTargetWidth     int                    `toml:"drop_target_width"`     // Outline width (px) of drop-target indicator
 	Colors              map[string][]int       `toml:"colors"`                // List of color values for gui elements
 	Keys                map[string]KeyBindings `toml:"keys"`                  // Event bindings for keyboard shortcuts
 	Mouse               map[string]KeyBindings `toml:"mouse"`                 // Event bindings for mouse buttons
 	Modes               map[string]Mode        `toml:"modes"`                 // Alternate keyboard shortcut layers
-	Corners             map[string]string      `toml:"corners"`               // Event bindings for hot-corner actions
 	Systray             map[string]string      `toml:"systray"`               // Event bindings for systray icon
 }
 
@@ -140,12 +137,10 @@ func readConfig(configFilePath string, initial bool) bool {
 	if initial {
 		keys, _ := json.MarshalIndent(Config.Keys, "", "  ")
 		mouse, _ := json.MarshalIndent(Config.Mouse, "", "  ")
-		corners, _ := json.MarshalIndent(Config.Corners, "", "  ")
 		systray, _ := json.MarshalIndent(Config.Systray, "", "  ")
 
 		fmt.Printf("KEYS: %s\n", RemoveChars(string(keys), []string{"{", "}", "\"", ","}))
 		fmt.Printf("MOUSE: %s\n", RemoveChars(string(mouse), []string{"{", "}", "\"", ","}))
-		fmt.Printf("CORNERS: %s\n", RemoveChars(string(corners), []string{"{", "}", "\"", ","}))
 		fmt.Printf("SYSTRAY: %s\n", RemoveChars(string(systray), []string{"{", "}", "\"", ","}))
 	}
 

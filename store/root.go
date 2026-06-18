@@ -42,10 +42,9 @@ type XWorkplace struct {
 }
 
 type XDisplays struct {
-	Name     string    // Unique heads name (display summary)
-	Screens  []XHead   // Screen dimensions (full display size)
-	Desktops []XHead   // Desktop dimensions (desktop without panels)
-	Corners  []*Corner // Display corners (for pointer events)
+	Name     string  // Unique heads name (display summary)
+	Screens  []XHead // Screen dimensions (full display size)
+	Desktops []XHead // Desktop dimensions (desktop without panels)
 }
 
 type XHead struct {
@@ -369,7 +368,6 @@ func DisplaysGet(X *xgbutil.XUtil) XDisplays {
 	heads := XDisplays{Name: name}
 	heads.Screens = screens
 	heads.Desktops = desktops
-	heads.Corners = CreateCorners(screens)
 
 	// Update screen count
 	Workplace.ScreenCount = uint(len(heads.Screens))

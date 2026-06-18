@@ -39,9 +39,6 @@ func BindMouse(tr *desktop.Tracker) {
 		// Evaluate workspace state
 		updateWorkspace(tr)
 
-		// Evaluate corner state
-		updateCorner(tr)
-
 		// Evaluate focus state
 		updateFocus(tr)
 
@@ -112,19 +109,6 @@ func updateWorkspace(tr *desktop.Tracker) {
 
 	// Store last workspace
 	workspace = ws
-}
-
-func updateCorner(tr *desktop.Tracker) {
-	hc := store.HotCorner()
-	if hc == nil {
-		return
-	}
-
-	// Communicate corner change
-	tr.Channels.Event <- "corner_change"
-
-	// Execute action
-	ExecuteAction(common.Config.Corners[hc.Name], tr, tr.ActiveWorkspace())
 }
 
 func updateFocus(tr *desktop.Tracker) {
