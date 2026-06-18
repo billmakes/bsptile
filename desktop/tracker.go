@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"sync"
 	"time"
 
 	"github.com/jezek/xgb/xproto"
@@ -22,6 +23,12 @@ type Tracker struct {
 	Handlers    *Handlers                       // Helper for event handlers
 	Initialized bool                            // Initial client restoration is complete
 
+	// muteUntil suppresses drag-detection from the move/swap handler while
+	// layout-driven ConfigureNotify events are still settling. Without this,
+	// every keyboard move triggers handleMoveClient, which lights up the drop
+	// indicator and registers spurious swap handlers.
+	muteUntil time.Time
+	muteMu    sync.Mutex
 }
 type Channels struct {
 	Event  chan string // Channel for events
@@ -166,6 +173,10 @@ func (tr *Tracker) Tile(ws *Workspace) {
 		return
 	}
 
+	// Mute drag-detection while the resulting ConfigureNotify events fly. The
+	// async X round trip can take many tens of ms; 200 ms is conservative.
+	tr.muteHandlers(200 * time.Millisecond)
+
 	// Tile workspace
 	ws.Tile()
 
@@ -174,6 +185,24 @@ func (tr *Tracker) Tile(ws *Workspace) {
 
 	// Communicate workspaces change
 	tr.Channels.Event <- "workspaces_change"
+
+	// A previous user drag may have left a drop indicator on screen. Once the
+	// layout has settled there's nothing left to drop onto, so hide it.
+	store.HideDropIndicator()
+}
+
+func (tr *Tracker) muteHandlers(d time.Duration) {
+	tr.muteMu.Lock()
+	defer tr.muteMu.Unlock()
+	if until := time.Now().Add(d); until.After(tr.muteUntil) {
+		tr.muteUntil = until
+	}
+}
+
+func (tr *Tracker) handlersMuted() bool {
+	tr.muteMu.Lock()
+	defer tr.muteMu.Unlock()
+	return time.Now().Before(tr.muteUntil)
 }
 
 func (tr *Tracker) Restore(ws *Workspace, flag uint8) {
@@ -441,6 +470,13 @@ func (tr *Tracker) handleResizeClient(c *store.Client) {
 func (tr *Tracker) handleMoveClient(c *store.Client) {
 	ws := tr.ClientWorkspace(c)
 	if !tr.isTracked(c.Window.Id) || store.IsMaximized(store.GetInfo(c.Window.Id)) {
+		return
+	}
+
+	// Skip drag detection while the layout is mid-tile. Otherwise the
+	// ConfigureNotify storm from a swap or cross-screen move would register
+	// fake swap/insert handlers and flash the drop indicator.
+	if tr.handlersMuted() {
 		return
 	}
 

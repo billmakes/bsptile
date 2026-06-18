@@ -436,11 +436,7 @@ func MoveDirectionWindow(tr *desktop.Tracker, ws *desktop.Workspace, d common.Di
 
 	target := ws.ActiveLayout().DirectionClient(d)
 	if target == nil {
-		screen, ok := DirectionScreen(ws.Location.Screen, d)
-		if !ok {
-			return false
-		}
-		return MoveWindowToScreen(tr, active, uint32(screen))
+		return moveDirectionAcrossScreens(tr, ws, active, d, movePointer)
 	}
 	targetCenter := target.Latest.Dimensions.Geometry.Center()
 
@@ -452,6 +448,98 @@ func MoveDirectionWindow(tr *desktop.Tracker, ws *desktop.Workspace, d common.Di
 	}
 
 	return true
+}
+
+// moveDirectionAcrossScreens handles Super+Shift+Direction when there is no
+// in-screen swap target. Instead of dumping the window in the center of the
+// destination screen (the legacy behavior), find the nearest visible client on
+// that screen and BSP-insert against its facing edge — mirroring how focus
+// crosses the monitor boundary. With the destination known up front we can
+// also warp the pointer synchronously instead of polling.
+func moveDirectionAcrossScreens(tr *desktop.Tracker, source *desktop.Workspace, active *store.Client, d common.Direction, movePointer bool) bool {
+	screen, ok := DirectionScreen(source.Location.Screen, d)
+	if !ok {
+		return false
+	}
+	target := tr.WorkspaceAt(source.Location.Desktop, screen)
+	if target == nil || target == source {
+		return false
+	}
+
+	// Pick the client on the destination screen closest to the source side.
+	pivot := edgeClientForArrival(target, active, d)
+
+	source.RemoveClient(active)
+	active.Latest.Location.Screen = screen
+
+	if pivot != nil {
+		target.ActiveLayout().GetManager().InsertClient(active, pivot, arrivalEdge(d))
+	} else {
+		target.AddClient(active)
+	}
+
+	if source.TilingEnabled() {
+		tr.Tile(source)
+	}
+	if target.TilingEnabled() {
+		tr.Tile(target)
+	} else {
+		active.Restore(store.Latest)
+	}
+
+	store.ActiveWindowSet(store.X, active.Window)
+	if movePointer {
+		// Tile has updated the new geometry; warp directly there.
+		store.PointerMove(store.X, active.Latest.Dimensions.Geometry.Center())
+	}
+
+	return true
+}
+
+// edgeClientForArrival returns the client on target that sits closest to the
+// edge the moving window arrives from. Moving Right → leftmost client on the
+// destination, etc.
+func edgeClientForArrival(target *desktop.Workspace, moving *store.Client, d common.Direction) *store.Client {
+	var best *store.Client
+	var bestVal int
+	for _, c := range target.VisibleClients() {
+		if c == nil || c == moving {
+			continue
+		}
+		x, y, w, h := c.Latest.Dimensions.Geometry.Pieces()
+		var val int
+		switch d {
+		case common.Right:
+			val = -x // smaller x wins
+		case common.Left:
+			val = x + w // larger x+w wins
+		case common.Down:
+			val = -y
+		case common.Up:
+			val = y + h
+		}
+		if best == nil || val > bestVal {
+			best = c
+			bestVal = val
+		}
+	}
+	return best
+}
+
+// arrivalEdge is the BSP edge on the pivot where the moving window should land
+// — the side facing the source screen.
+func arrivalEdge(d common.Direction) string {
+	switch d {
+	case common.Right:
+		return "left"
+	case common.Left:
+		return "right"
+	case common.Down:
+		return "top"
+	case common.Up:
+		return "bottom"
+	}
+	return ""
 }
 
 func DirectionScreen(source uint, d common.Direction) (uint, bool) {
