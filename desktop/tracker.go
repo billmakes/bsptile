@@ -34,10 +34,11 @@ type Handlers struct {
 	MoveClient   *Handler    // Stores client for tiling after move
 	SwapClient   *Handler    // Stores clients for window swap
 	SwapScreen   *Handler    // Stores client for screen swap
+	InsertClient *Handler    // Stores clients + edge for split-insert
 }
 
 func (h *Handlers) Active() bool {
-	return h.ResizeClient.Active() || h.MoveClient.Active() || h.SwapClient.Active() || h.SwapScreen.Active()
+	return h.ResizeClient.Active() || h.MoveClient.Active() || h.SwapClient.Active() || h.SwapScreen.Active() || h.InsertClient.Active()
 }
 
 func (h *Handlers) Reset() {
@@ -45,12 +46,14 @@ func (h *Handlers) Reset() {
 	h.MoveClient.Reset()
 	h.SwapClient.Reset()
 	h.SwapScreen.Reset()
+	h.InsertClient.Reset()
 }
 
 type Handler struct {
 	Dragging bool        // Indicates pointer dragging event
 	Source   interface{} // Stores moved/resized client
 	Target   interface{} // Stores client/workspace
+	Edge     string      // Optional edge hint for insert handler (left/right/top/bottom)
 }
 
 func (h *Handler) Active() bool {
@@ -74,6 +77,7 @@ func CreateTracker() *Tracker {
 			MoveClient:   &Handler{},
 			SwapClient:   &Handler{},
 			SwapScreen:   &Handler{},
+			InsertClient: &Handler{},
 		},
 		Initialized: false,
 	}
@@ -426,11 +430,28 @@ func (tr *Tracker) handleMoveClient(c *store.Client) {
 		targetDesktop := store.Workplace.CurrentDesktop
 		targetScreen := store.ScreenGet(targetPoint)
 
-		// Check if target point hovers another client
+		// Check if target point hovers another client (possibly on a different screen)
 		tr.Handlers.SwapClient.Reset()
-		if co := tr.ClientAt(ws, targetPoint); co != nil && co != c {
-			tr.Handlers.SwapClient = &Handler{Source: c, Target: co}
-			log.Debug("Client swap handler active [", c.Latest.Class, "-", co.Latest.Class, "]")
+		tr.Handlers.InsertClient.Reset()
+		targetWs := tr.WorkspaceAt(targetDesktop, targetScreen)
+		if targetWs == nil {
+			targetWs = ws
+		}
+		if co := tr.ClientAt(targetWs, targetPoint); co != nil && co != c {
+			tx, ty, tw, th := co.OuterGeometry()
+			edge := dropEdge(targetPoint.X, targetPoint.Y, tx, ty, tw, th, 0.25)
+			if edge == "" {
+				tr.Handlers.SwapClient = &Handler{Source: c, Target: co}
+				log.Debug("Client swap handler active [", c.Latest.Class, "-", co.Latest.Class, "]")
+				store.ShowDropIndicator(&store.DropZone{Target: co.Window.Id, X: tx, Y: ty, W: tw, H: th})
+			} else {
+				tr.Handlers.InsertClient = &Handler{Source: c, Target: co, Edge: edge}
+				log.Debug("Client insert handler active [", c.Latest.Class, " ", edge, " of ", co.Latest.Class, "]")
+				zx, zy, zw, zh := dropZoneRect(edge, tx, ty, tw, th)
+				store.ShowDropIndicator(&store.DropZone{Target: co.Window.Id, Edge: edge, X: zx, Y: zy, W: zw, H: zh})
+			}
+		} else {
+			store.HideDropIndicator()
 		}
 
 		// Check if target point moves to another screen
@@ -528,6 +549,7 @@ func (tr *Tracker) onStateUpdate(state string, desktop uint, screen uint) {
 	if viewportChanged || clientsChanged || focusChanged {
 
 		// Deactivate handlers
+		store.HideDropIndicator()
 		tr.Handlers.Reset()
 
 		// Unlock clients
@@ -569,9 +591,13 @@ func (tr *Tracker) onPointerUpdate(pointer store.XPointer, desktop uint, screen 
 		if tr.Handlers.SwapClient.Active() {
 			tr.handleSwapClient(tr.Handlers.SwapClient)
 		}
+		if tr.Handlers.InsertClient.Active() {
+			tr.handleInsertClient(tr.Handlers.InsertClient)
+		}
 
 		// Window moved or resized
 		if tr.Handlers.MoveClient.Active() || tr.Handlers.ResizeClient.Active() {
+			store.HideDropIndicator()
 			tr.Handlers.MoveClient.Reset()
 			tr.Handlers.ResizeClient.Reset()
 
@@ -630,4 +656,55 @@ func (tr *Tracker) isTracked(w xproto.Window) bool {
 func (tr *Tracker) isTrackable(w xproto.Window) bool {
 	info := store.GetInfo(w)
 	return !store.IsSpecial(info) && !store.IsIgnored(info)
+}
+
+func dropEdge(px, py, x, y, w, h int, zone float64) string {
+	if w <= 0 || h <= 0 {
+		return ""
+	}
+	rx := float64(px-x) / float64(w)
+	ry := float64(py-y) / float64(h)
+	dl, dr, dt, db := rx, 1-rx, ry, 1-ry
+	min := dl
+	edge := "left"
+	if dr < min {
+		min, edge = dr, "right"
+	}
+	if dt < min {
+		min, edge = dt, "top"
+	}
+	if db < min {
+		min, edge = db, "bottom"
+	}
+	if min > zone {
+		return ""
+	}
+	return edge
+}
+
+func dropZoneRect(edge string, x, y, w, h int) (int, int, int, int) {
+	switch edge {
+	case "left":
+		return x, y, w / 2, h
+	case "right":
+		return x + w/2, y, w - w/2, h
+	case "top":
+		return x, y, w, h / 2
+	case "bottom":
+		return x, y + h/2, w, h - h/2
+	}
+	return x, y, w, h
+}
+
+func (tr *Tracker) handleInsertClient(h *Handler) {
+	c, target := h.Source.(*store.Client), h.Target.(*store.Client)
+	ws := tr.ClientWorkspace(c)
+	if !tr.isTracked(c.Window.Id) || ws == nil {
+		return
+	}
+	log.Debug("Client insert handler fired [", c.Latest.Class, " ", h.Edge, " of ", target.Latest.Class, "]")
+	mg := ws.ActiveLayout().GetManager()
+	mg.InsertClient(c, target, h.Edge)
+	h.Reset()
+	tr.Tile(ws)
 }

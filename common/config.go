@@ -32,6 +32,7 @@ type Configuration struct {
 	EdgeMarginPrimary []int                  `toml:"edge_margin_primary"` // Margin values of primary tiling area
 	EdgeCornerSize    int                    `toml:"edge_corner_size"`    // Size of square defining edge corners
 	EdgeCenterSize    int                    `toml:"edge_center_size"`    // Length of rectangle defining edge centers
+	DropTargetWidth   int                    `toml:"drop_target_width"`   // Outline width (px) of drop-target indicator
 	Colors            map[string][]int       `toml:"colors"`              // List of color values for gui elements
 	Keys              map[string]KeyBindings `toml:"keys"`                // Event bindings for keyboard shortcuts
 	Corners           map[string]string      `toml:"corners"`             // Event bindings for hot-corner actions

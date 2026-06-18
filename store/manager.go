@@ -149,6 +149,50 @@ func (mg *Manager) SwapClient(c1 *Client, c2 *Client) {
 	n1.Client, n2.Client = n2.Client, n1.Client
 }
 
+func (mg *Manager) InsertClient(source, target *Client, edge string) {
+	if source == nil || target == nil || source == target {
+		return
+	}
+	if mg.node(source) != nil {
+		mg.RemoveClient(source)
+	}
+	targetLeaf := mg.node(target)
+	if targetLeaf == nil {
+		return
+	}
+	var split string
+	sourceFirst := false
+	switch edge {
+	case "left":
+		split, sourceFirst = SplitVertical, true
+	case "right":
+		split, sourceFirst = SplitVertical, false
+	case "top":
+		split, sourceFirst = SplitHorizontal, true
+	case "bottom":
+		split, sourceFirst = SplitHorizontal, false
+	default:
+		return
+	}
+	log.Info("Insert BSP leaf [", source.Latest.Class, " ", edge, " of ", target.Latest.Class, ", ", mg.Name, "]")
+	sourceLeaf := &Node{Client: source, Ratio: 0.5}
+	parent := &Node{Parent: targetLeaf.Parent, Split: split, Ratio: 0.5}
+	if sourceFirst {
+		parent.First, parent.Second = sourceLeaf, targetLeaf
+	} else {
+		parent.First, parent.Second = targetLeaf, sourceLeaf
+	}
+	parent.First.Parent = parent
+	parent.Second.Parent = parent
+	if parent.Parent == nil {
+		mg.Root = parent
+	} else if parent.Parent.First == targetLeaf {
+		parent.Parent.First = parent
+	} else {
+		parent.Parent.Second = parent
+	}
+}
+
 func (mg *Manager) ActiveClient() *Client {
 	if node := mg.activeNode(); node != nil {
 		return node.Client

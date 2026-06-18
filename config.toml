@@ -74,6 +74,9 @@ edge_corner_size = 10
 # Width or height of a hot-corner area within the edge centers (0 - 100).
 edge_center_size = 100
 
+# Outline thickness in pixels of the drop-target indicator shown while dragging.
+drop_target_width = 4
+
 ################################################################################
 [colors]                             # RGBA color values used for ui elements. #
 ################################################################################
@@ -89,6 +92,13 @@ gui_client_slave = [58, 58, 78, 255]
 
 # Focused BSP leaf color.
 gui_client_master = [98, 98, 128, 255]
+
+# Outline color for the drop target shown while dragging a window onto another.
+gui_drop_target = [255, 170, 60, 255]
+
+# Fill color for the drop-target indicator (RGBA). Alpha controls opacity (0 = disabled).
+# Requires a compositor (e.g., xfwm4 compositing). Set alpha 0 to disable the fill.
+gui_drop_target_fill = [255, 170, 60, 0]
 
 # Systray icon background color.
 icon_background = [0, 0, 0, 0]
