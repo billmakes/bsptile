@@ -341,8 +341,10 @@ func (tr *Tracker) handleMaximizedClient(c *store.Client) {
 		// Unmaximize window
 		c.UnMaximize()
 
-		// Activate maximized layout
-		if !c.IsNew() && ws.ActiveLayout().GetName() != "maximized" {
+		// Toggle maximized layout. The window manager sends the same maximize
+		// state request when the title-bar button is used to leave maximized
+		// mode because bsptile removes the native maximized state itself.
+		if !c.IsNew() {
 			tr.Channels.Action <- "layout_maximized"
 			store.ActiveWindowSet(store.X, c.Window)
 		}
