@@ -152,6 +152,20 @@ const (
 	Right
 )
 
+func Opposite(d Direction) Direction {
+	switch d {
+	case Up:
+		return Down
+	case Down:
+		return Up
+	case Left:
+		return Right
+	case Right:
+		return Left
+	}
+	return d
+}
+
 type DirectionScore struct {
 	Distance  int
 	Primary   int

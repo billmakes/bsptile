@@ -195,6 +195,14 @@ proportion_increase = "Control-Shift-Insert"
 # Decrease the BSP split containing the active window (Delete = Del).
 proportion_decrease = "Control-Shift-Delete"
 
+# Resize the active window toward the named direction. The edge facing that
+# direction grows outward when possible; otherwise the opposite edge is pulled
+# in (so the window always responds, either extending or compressing).
+resize_left = ""
+resize_right = ""
+resize_up = ""
+resize_down = ""
+
 # Some commands above will affect all screens if this key is pressed in addition (Mod1 = Alt_L).
 mod_screens = "Mod1"
 

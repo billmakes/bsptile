@@ -100,6 +100,14 @@ func ExecuteAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) bo
 		success = IncreaseProportion(tr, ws)
 	case "proportion_decrease":
 		success = DecreaseProportion(tr, ws)
+	case "resize_left":
+		success = Resize(tr, ws, common.Left)
+	case "resize_right":
+		success = Resize(tr, ws, common.Right)
+	case "resize_up":
+		success = Resize(tr, ws, common.Up)
+	case "resize_down":
+		success = Resize(tr, ws, common.Down)
 	case "proportion_up":
 		success = DirectionProportion(tr, ws, common.Up)
 	case "proportion_down":
@@ -758,6 +766,22 @@ func DecreaseProportion(tr *desktop.Tracker, ws *desktop.Workspace) bool {
 	ws.ActiveLayout().DecreaseProportion()
 	tr.Tile(ws)
 
+	return true
+}
+
+// Resize nudges the active window in direction d. It first tries to extend
+// the edge facing d outward; if that edge is already at the screen border, it
+// falls back to pulling the opposite edge in the same direction. So the
+// active window always responds to "resize_right" by having something move
+// rightward — either growing on the right or shrinking from the left.
+func Resize(tr *desktop.Tracker, ws *desktop.Workspace, direction common.Direction) bool {
+	if ws.TilingDisabled() {
+		return false
+	}
+	if !ws.ActiveLayout().GetManager().ResizeDirection(direction) {
+		return false
+	}
+	tr.Tile(ws)
 	return true
 }
 

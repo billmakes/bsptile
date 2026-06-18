@@ -105,20 +105,27 @@ super + ctrl + shift + h
 # proportion
 #
 
-# grow / shrink the focused BSP split
+# grow / shrink the focused BSP split (non-directional — operates on the
+# active leaf's immediate parent split).
 super + plus
     bsptilectl action proportion_increase
 super + minus
     bsptilectl action proportion_decrease
 
-# resize mode as an sxhkd chord:
-#   super + shift + r, then h/j/k/l (or arrow keys) to move the nearest split.
-# This is the sxhkd-native version of bsptile's internal `mode_resize` — it
-# avoids the mode state in the daemon, which would be invisible to sxhkd anyway.
-super + shift + r ; {h,j,k,l}
-    bsptilectl action proportion_{left,down,up,right}
-super + shift + r ; {Left,Down,Up,Right}
-    bsptilectl action proportion_{left,down,up,right}
+# directional resize: nudge the active window toward the named direction. The
+# matching edge grows outward when there's room; otherwise the opposite edge
+# is pulled inward so the action always does something.
+super + alt + {h,j,k,l}
+    bsptilectl action resize_{left,down,up,right}
+super + alt + {Left,Down,Up,Right}
+    bsptilectl action resize_{left,down,up,right}
+
+# sticky resize "mode" via sxhkd chord: super+shift+r, then nudge with h/j/k/l
+# or arrow keys. Press Escape to exit.
+super + shift + r : {h,j,k,l}
+    bsptilectl action resize_{left,down,up,right}
+super + shift + r : {Left,Down,Up,Right}
+    bsptilectl action resize_{left,down,up,right}
 
 #
 # broadcast modifiers

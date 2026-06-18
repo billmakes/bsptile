@@ -329,6 +329,65 @@ func TestBSPDirectionProportionUsesNearestMatchingAncestor(t *testing.T) {
 	}
 }
 
+func TestBSPResizeDirectionFallsBackToShrinkAtScreenEdge(t *testing.T) {
+	previousStep := common.Config.ProportionStep
+	previousMin := common.Config.ProportionMin
+	common.Config.ProportionStep = 0.1
+	common.Config.ProportionMin = 0.1
+	t.Cleanup(func() {
+		common.Config.ProportionStep = previousStep
+		common.Config.ProportionMin = previousMin
+	})
+
+	// Tree:
+	//        root (V, 0.5)
+	//        /   \
+	//      left   right (H, 0.5)
+	//             /   \
+	//          topR   bottomR
+	//
+	// Active = bottomR. Its right and bottom edges are at the screen border;
+	// its left edge is the root V split; its top edge is the inner H split.
+	left := &Node{Client: testClient(1)}
+	topRight := &Node{Client: testClient(2)}
+	bottomRight := &Node{Client: testClient(3)}
+	right := &Node{First: topRight, Second: bottomRight, Split: SplitHorizontal, Ratio: 0.5}
+	root := &Node{First: left, Second: right, Split: SplitVertical, Ratio: 0.5}
+	left.Parent = root
+	right.Parent = root
+	topRight.Parent = right
+	bottomRight.Parent = right
+	mg := &Manager{Root: root}
+	Windows = &XWindows{Active: *bottomRight.Client.Window}
+
+	// resize_left: grow_left works (decrease root) since bottomR's left edge
+	// IS the root V split boundary.
+	if !mg.ResizeDirection(common.Left) || root.Ratio != 0.4 {
+		t.Fatalf("resize_left: root ratio = %v, want 0.4 (grow_left path)", root.Ratio)
+	}
+
+	// resize_right: grow_right has no matching ancestor (right edge is the
+	// screen), so it falls back to shrink_left — moving bottomR's left edge
+	// rightward — which means INCREASING the root ratio.
+	rootBefore := root.Ratio
+	if !mg.ResizeDirection(common.Right) {
+		t.Fatal("resize_right should fall back to shrink at screen edge")
+	}
+	if root.Ratio != rootBefore+0.1 {
+		t.Fatalf("resize_right fallback: root ratio = %v, want %v", root.Ratio, rootBefore+0.1)
+	}
+
+	// resize_down: same fallback story on the H axis. Fallback shrinks
+	// bottomR's top edge downward by INCREASING the inner H ratio.
+	rightBefore := right.Ratio
+	if !mg.ResizeDirection(common.Down) {
+		t.Fatal("resize_down should fall back to shrink at screen edge")
+	}
+	if right.Ratio != rightBefore+0.1 {
+		t.Fatalf("resize_down fallback: right ratio = %v, want %v", right.Ratio, rightBefore+0.1)
+	}
+}
+
 func TestDirectionClientPrioritizesDistanceInRequestedDirection(t *testing.T) {
 	active := testClient(1)
 	nearLeft := testClient(2)

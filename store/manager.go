@@ -354,6 +354,66 @@ func (mg *Manager) DecreaseProportion() {
 	mg.resizeActive(-common.Config.ProportionStep)
 }
 
+// ResizeDirection nudges the active window in direction d so that *something*
+// moves that way. It first tries to grow the named edge outward; if that edge
+// is already at the screen border (no matching ancestor), it falls back to
+// shrinking the opposite edge in the same direction. With this, "resize_right"
+// always reacts: either the right edge extends rightward, or the left edge is
+// pulled rightward against a fixed right edge.
+func (mg *Manager) ResizeDirection(d common.Direction) bool {
+	if mg.GrowDirection(d, true) {
+		return true
+	}
+	return mg.GrowDirection(common.Opposite(d), false)
+}
+
+// GrowDirection moves the active leaf's edge on the named side outward
+// (when grow is true) or inward (when grow is false). It walks up the BSP
+// tree to find the first ancestor split whose boundary IS that edge — i.e.
+// a vertical split where the active leaf's subtree sits on the First half
+// for the right edge, or on the Second half for the left edge (and the
+// equivalent for top/bottom on horizontal splits). Returns false when the
+// edge is at the screen border (no matching ancestor) or the clamp blocks
+// further movement.
+func (mg *Manager) GrowDirection(d common.Direction, grow bool) bool {
+	leaf := mg.activeNode()
+	if leaf == nil {
+		return false
+	}
+
+	split := SplitVertical
+	if d == common.Up || d == common.Down {
+		split = SplitHorizontal
+	}
+
+	// Right and Down edges live on the First side of their split (the boundary
+	// is "after" the First child). Left and Up edges live on the Second side.
+	edgeFirst := d == common.Right || d == common.Down
+
+	delta := common.Config.ProportionStep
+	// Growing the First-side edge means pushing the boundary outward —
+	// increasing the ratio. Growing a Second-side edge means decreasing.
+	// Shrinking is the opposite.
+	if (edgeFirst && !grow) || (!edgeFirst && grow) {
+		delta = -delta
+	}
+
+	child := leaf
+	for node := leaf.Parent; node != nil; node = node.Parent {
+		if node.Split == split && (node.First == child) == edgeFirst {
+			ratio := clampRatio(node.Ratio + delta)
+			if ratio == node.Ratio {
+				return false
+			}
+			node.Ratio = ratio
+			return true
+		}
+		child = node
+	}
+
+	return false
+}
+
 func (mg *Manager) DirectionProportion(direction common.Direction) bool {
 	leaf := mg.activeNode()
 	if leaf == nil {
