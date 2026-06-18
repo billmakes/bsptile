@@ -276,8 +276,12 @@ func MaximizedLayout(tr *desktop.Tracker, ws *desktop.Workspace) bool {
 	if ws.TilingDisabled() {
 		return false
 	}
+	target := "maximized"
+	if ws.ActiveLayout().GetName() == "maximized" {
+		target = "bsp"
+	}
 	for i, l := range ws.Layouts {
-		if l.GetName() == "maximized" {
+		if l.GetName() == target {
 			ws.SetLayout(uint(i))
 		}
 	}
@@ -293,8 +297,12 @@ func FullscreenLayout(tr *desktop.Tracker, ws *desktop.Workspace) bool {
 	if ws.TilingDisabled() {
 		return false
 	}
+	target := "fullscreen"
+	if ws.ActiveLayout().GetName() == "fullscreen" {
+		target = "bsp"
+	}
 	for i, l := range ws.Layouts {
-		if l.GetName() == "fullscreen" {
+		if l.GetName() == target {
 			ws.SetLayout(uint(i))
 		}
 	}
