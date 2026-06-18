@@ -58,6 +58,8 @@ func ExecuteAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) bo
 		success = Restore(tr, ws)
 	case "reset":
 		success = Reset(tr, ws)
+	case "balance":
+		success = Balance(tr, ws)
 	case "tree_rotate":
 		success = RotateTree(tr, ws)
 	case "layout_bsp":
@@ -250,6 +252,19 @@ func Reset(tr *desktop.Tracker, ws *desktop.Workspace) bool {
 		return false
 	}
 	ws.ResetLayouts()
+	tr.Tile(ws)
+
+	ui.ShowLayout(ws)
+	ui.UpdateIcon(ws)
+
+	return true
+}
+
+func Balance(tr *desktop.Tracker, ws *desktop.Workspace) bool {
+	if ws.TilingDisabled() {
+		return false
+	}
+	ws.ActiveLayout().GetManager().Balance()
 	tr.Tile(ws)
 
 	ui.ShowLayout(ws)

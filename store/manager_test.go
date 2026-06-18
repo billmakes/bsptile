@@ -1,6 +1,7 @@
 package store
 
 import (
+	"math"
 	"testing"
 
 	"github.com/jezek/xgb/xproto"
@@ -159,6 +160,77 @@ func TestBSPRotateClockwise(t *testing.T) {
 	if right.Split != SplitHorizontal || right.First != b || right.Second != a {
 		t.Fatal("second rotation changed nested child order incorrectly")
 	}
+}
+
+func TestBSPBalanceProducesEqualLeafAreas(t *testing.T) {
+	// Unbalanced tree: root vertically splits into one leaf (left) and a
+	// horizontally split subtree of two leaves (right).
+	left := &Node{Client: testClient(1)}
+	topRight := &Node{Client: testClient(2)}
+	bottomRight := &Node{Client: testClient(3)}
+	right := &Node{
+		First:  topRight,
+		Second: bottomRight,
+		Split:  SplitHorizontal,
+		Ratio:  0.5,
+	}
+	root := &Node{
+		First:  left,
+		Second: right,
+		Split:  SplitVertical,
+		Ratio:  0.5,
+	}
+	left.Parent = root
+	right.Parent = root
+	topRight.Parent = right
+	bottomRight.Parent = right
+	mg := &Manager{Root: root}
+
+	mg.Balance()
+
+	// Left leaf carries 1 of 3 windows, so the root split should give it 1/3.
+	if math.Abs(root.Ratio-1.0/3.0) > 1e-9 {
+		t.Fatalf("root ratio = %v, want 1/3", root.Ratio)
+	}
+	// The right subtree's children each carry one window, so a half split.
+	if math.Abs(right.Ratio-0.5) > 1e-9 {
+		t.Fatalf("nested ratio = %v, want 0.5", right.Ratio)
+	}
+
+	// Walk the tree the same way applyNode does and check every leaf ends up
+	// with the same area. Done inline to avoid Apply()'s X-server side effects.
+	leafBounds := walkBounds(root, common.Geometry{Width: 900, Height: 900})
+	if len(leafBounds) != 3 {
+		t.Fatalf("expected 3 leaves, got %d", len(leafBounds))
+	}
+	expected := leafBounds[0].Width * leafBounds[0].Height
+	for i, b := range leafBounds {
+		if b.Width*b.Height != expected {
+			t.Fatalf("leaf %d area = %d, want %d", i, b.Width*b.Height, expected)
+		}
+	}
+}
+
+func walkBounds(node *Node, geom common.Geometry) []common.Geometry {
+	if node == nil {
+		return nil
+	}
+	if node.leaf() {
+		return []common.Geometry{geom}
+	}
+	first, second := geom, geom
+	if node.Split == SplitVertical {
+		size := int(math.Round(float64(geom.Width) * node.Ratio))
+		first.Width = size
+		second.X += size
+		second.Width -= size
+	} else {
+		size := int(math.Round(float64(geom.Height) * node.Ratio))
+		first.Height = size
+		second.Y += size
+		second.Height -= size
+	}
+	return append(walkBounds(node.First, first), walkBounds(node.Second, second)...)
 }
 
 func TestBSPResizeUpdatesSharedBoundaries(t *testing.T) {

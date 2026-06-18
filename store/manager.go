@@ -259,8 +259,28 @@ func (mg *Manager) Reset() {
 	mg.resetNode(mg.Root)
 }
 
+func (mg *Manager) Balance() {
+	mg.balanceNode(mg.Root)
+}
+
 func (mg *Manager) Rotate() {
 	mg.rotateNode(mg.Root)
+}
+
+func (mg *Manager) balanceNode(node *Node) int {
+	if node == nil {
+		return 0
+	}
+	if node.leaf() {
+		return 1
+	}
+	first := mg.balanceNode(node.First)
+	second := mg.balanceNode(node.Second)
+	total := first + second
+	if total > 0 {
+		node.Ratio = float64(first) / float64(total)
+	}
+	return total
 }
 
 func (mg *Manager) rotateNode(node *Node) {
