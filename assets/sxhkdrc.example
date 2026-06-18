@@ -95,6 +95,18 @@ super + ctrl + j
 super + ctrl + k
     bsptilectl action position_previous
 
+# send the active window to a numbered desktop. Going through bsptilectl
+# (rather than xfwm's "Move window to workspace N" shortcut) lets bsptile
+# rewire both the source and destination BSP trees cleanly.
+super + shift + {1-9}
+    bsptilectl action window_to_desktop_{1-9}
+
+# relative desktop send
+super + shift + bracketleft
+    bsptilectl action window_to_desktop_previous
+super + shift + bracketright
+    bsptilectl action window_to_desktop_next
+
 # move the active window to the next/previous screen
 super + ctrl + l
     bsptilectl action screen_next

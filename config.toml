@@ -268,3 +268,45 @@ scroll_left = "proportion_decrease"
 
 # Icon horizontal scroll right with pointer.
 scroll_right = "proportion_increase"
+
+################################################################################
+# [[window_rules]]                                                             #
+# Per-class overrides applied when a window is first tracked.                  #
+#   class    = RE2 regex for WM_CLASS (required)                               #
+#   name     = RE2 regex for WM_NAME (optional)                                #
+#   floating = true → leave unmanaged (same shape as window_ignore)            #
+#   tile     = true → force-tile even when IsFloating would say no             #
+#   monitor  = 1-indexed monitor number to send the window to                  #
+#   desktop  = 1-indexed desktop number to send the window to                  #
+#                                                                              #
+# First match wins, in declaration order.                                      #
+################################################################################
+
+# [[window_rules]]
+# class = "Pavucontrol"
+# floating = true
+#
+# [[window_rules]]
+# class = "Firefox"
+# monitor = 2
+# desktop = 1
+
+################################################################################
+# [[workspace_rules]]                                                          #
+# Initial state for a workspace ((desktop, screen) pair). Runtime toggles      #
+# still win until the next restart or reload.                                  #
+#   desktop    = 1-indexed desktop number (required)                           #
+#   screen     = 1-indexed monitor; omit to apply to every screen of desktop   #
+#   tiling     = override tiling_enabled                                       #
+#   layout     = "bsp" | "maximized" | "fullscreen"                            #
+#   decoration = override window_decoration                                    #
+################################################################################
+
+# [[workspace_rules]]
+# desktop = 2
+# tiling = false
+#
+# [[workspace_rules]]
+# desktop = 3
+# screen = 1
+# layout = "maximized"

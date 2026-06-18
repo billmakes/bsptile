@@ -34,12 +34,37 @@ func CreateWorkspaces() map[store.Location]*Workspace {
 				Tiling:   common.Config.TilingEnabled,
 			}
 
+			// Apply matching workspace_rule on top of the global defaults.
+			applyWorkspaceRule(ws, common.MatchWorkspaceRule(desktop, screen))
+
 			// Map location to workspace
 			workspaces[location] = ws
 		}
 	}
 
 	return workspaces
+}
+
+func applyWorkspaceRule(ws *Workspace, rule *common.WorkspaceRule) {
+	if rule == nil {
+		return
+	}
+	if rule.Tiling != nil {
+		ws.Tiling = *rule.Tiling
+	}
+	if rule.Layout != "" {
+		for i, l := range ws.Layouts {
+			if l.GetName() == rule.Layout {
+				ws.Layout = uint(i)
+				break
+			}
+		}
+	}
+	if rule.Decoration != nil {
+		for _, l := range ws.Layouts {
+			l.GetManager().Decoration = *rule.Decoration
+		}
+	}
 }
 
 func CreateLayouts(loc store.Location) []Layout {

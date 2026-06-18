@@ -124,6 +124,18 @@ func (tr *Tracker) Update() {
 	for _, w := range store.Windows.Stacked {
 		info := store.GetInfo(w.Id)
 		trackable[w.Id] = !store.IsSpecial(info) && !store.IsIgnored(info)
+
+		// window_rule overrides: floating=true forces untrack, tile=true
+		// forces track (still respecting the hard IsSpecial block).
+		if rule := common.MatchWindowRule(info.Class, info.Name); rule != nil {
+			switch {
+			case rule.Floating:
+				trackable[w.Id] = false
+			case rule.Tile:
+				trackable[w.Id] = !store.IsSpecial(info)
+			}
+		}
+
 		if common.Config.WindowFloatingAbove && !trackable[w.Id] && store.IsFloating(info) {
 			store.SetAbove(w.Id)
 		}
@@ -323,6 +335,11 @@ func (tr *Tracker) trackWindow(w xproto.Window) bool {
 		screen := store.ScreenGet(store.Pointer.Position)
 		c.Latest.Location.Screen = screen
 	}
+
+	// Apply window_rule placement (monitor/desktop) before workspace lookup
+	// so AddClient lands the new client on the right BSP tree the first time.
+	applyWindowRulePlacement(c)
+
 	ws := tr.ClientWorkspace(c)
 	if ws == nil {
 		return false
@@ -337,6 +354,30 @@ func (tr *Tracker) trackWindow(w xproto.Window) bool {
 	tr.Tile(ws)
 
 	return true
+}
+
+// applyWindowRulePlacement consults the matching window_rule (if any) and
+// moves the client to its declared monitor/desktop before the workspace
+// lookup. Monitor and Desktop in the rule are 1-indexed.
+func applyWindowRulePlacement(c *store.Client) {
+	rule := common.MatchWindowRule(c.Latest.Class, c.Latest.Name)
+	if rule == nil {
+		return
+	}
+	if rule.Monitor != nil {
+		idx := uint(*rule.Monitor - 1)
+		if idx < store.Workplace.ScreenCount {
+			c.Latest.Location.Screen = idx
+			c.MoveToScreenDirect(uint32(idx))
+		}
+	}
+	if rule.Desktop != nil {
+		idx := uint(*rule.Desktop - 1)
+		if idx < store.Workplace.DesktopCount {
+			c.Latest.Location.Desktop = idx
+			c.MoveToDesktop(uint32(idx))
+		}
+	}
 }
 
 func (tr *Tracker) untrackWindow(w xproto.Window) bool {
@@ -487,7 +528,11 @@ func (tr *Tracker) handleResizeClient(c *store.Client) {
 
 func (tr *Tracker) handleMoveClient(c *store.Client) {
 	ws := tr.ClientWorkspace(c)
-	if !tr.isTracked(c.Window.Id) || store.IsMaximized(store.GetInfo(c.Window.Id)) {
+	if ws == nil || ws.TilingDisabled() || !tr.isTracked(c.Window.Id) || store.IsMaximized(store.GetInfo(c.Window.Id)) {
+		// Workspaces with tiling off don't have a BSP tree to drop into,
+		// so the drag-detection path (and its drop indicator) has nothing
+		// to do here.
+		store.HideDropIndicator()
 		return
 	}
 

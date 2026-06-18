@@ -2,6 +2,7 @@ package input
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -96,6 +97,10 @@ func ExecuteAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) bo
 		success = NextScreen(tr, ws)
 	case "screen_previous":
 		success = PreviousScreen(tr, ws)
+	case "window_to_desktop_next":
+		success = NextDesktop(tr, ws)
+	case "window_to_desktop_previous":
+		success = PreviousDesktop(tr, ws)
 	case "proportion_increase":
 		success = IncreaseProportion(tr, ws)
 	case "proportion_decrease":
@@ -123,7 +128,11 @@ func ExecuteAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) bo
 	case "exit":
 		success = Exit(tr)
 	default:
-		success = External(action)
+		if handled, ok := tryNumberedAction(action, tr, ws); ok {
+			success = handled
+		} else {
+			success = External(action)
+		}
 	}
 
 complete:
@@ -676,6 +685,61 @@ func PreviousScreen(tr *desktop.Tracker, ws *desktop.Workspace) bool {
 	}
 
 	return MoveWindowToScreen(tr, c, uint32(screen))
+}
+
+func NextDesktop(tr *desktop.Tracker, ws *desktop.Workspace) bool {
+	c := tr.ActiveClient()
+	if c == nil {
+		return false
+	}
+	next := int(c.Latest.Location.Desktop) + 1
+	if next > int(store.Workplace.DesktopCount)-1 {
+		return false
+	}
+	return MoveWindowToDesktop(tr, c, uint32(next))
+}
+
+func PreviousDesktop(tr *desktop.Tracker, ws *desktop.Workspace) bool {
+	c := tr.ActiveClient()
+	if c == nil {
+		return false
+	}
+	prev := int(c.Latest.Location.Desktop) - 1
+	if prev < 0 {
+		return false
+	}
+	return MoveWindowToDesktop(tr, c, uint32(prev))
+}
+
+// MoveWindowToDesktop sends c to the given 0-indexed desktop on the same
+// screen. It only writes _NET_WM_DESKTOP; tracker.handleWorkspaceChange
+// catches the resulting PropertyNotify and does the actual BSP rewiring and
+// tile of both source and destination. Manipulating the BSP tree directly
+// here would be undone by that handler.
+func MoveWindowToDesktop(tr *desktop.Tracker, c *store.Client, desktop uint32) bool {
+	if c == nil || uint(desktop) >= store.Workplace.DesktopCount {
+		return false
+	}
+	if c.Latest.Location.Desktop == uint(desktop) {
+		return false
+	}
+	return c.MoveToDesktop(desktop)
+}
+
+// tryNumberedAction handles action names with a trailing number, e.g.
+// window_to_desktop_3. Returns (success, ok) — ok=false means the prefix
+// didn't match anything we understand and the default branch should fall
+// through to External.
+func tryNumberedAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) (bool, bool) {
+	const prefix = "window_to_desktop_"
+	if !strings.HasPrefix(action, prefix) {
+		return false, false
+	}
+	n, err := strconv.Atoi(strings.TrimPrefix(action, prefix))
+	if err != nil || n < 1 {
+		return false, false
+	}
+	return MoveWindowToDesktop(tr, tr.ActiveClient(), uint32(n-1)), true
 }
 
 func MoveWindowToScreen(tr *desktop.Tracker, c *store.Client, screen uint32) bool {

@@ -39,6 +39,37 @@ type Configuration struct {
 	Mouse               map[string]KeyBindings `toml:"mouse"`                 // Event bindings for mouse buttons
 	Modes               map[string]Mode        `toml:"modes"`                 // Alternate keyboard shortcut layers
 	Systray             map[string]string      `toml:"systray"`               // Event bindings for systray icon
+	WindowRules         []WindowRule           `toml:"window_rules"`          // Per-class/name overrides applied when a window is first tracked
+	WorkspaceRules      []WorkspaceRule        `toml:"workspace_rules"`       // Per-workspace initial state overrides
+}
+
+// WindowRule applies overrides to a freshly tracked window whose WM_CLASS
+// matches Class and (if set) WM_NAME matches Name — both as RE2 regex.
+// First match wins; later rules are ignored.
+//
+// Indexing in Monitor/Desktop is 1-based to match what xfwm shows in its UI
+// (Workspace 1, Workspace 2, …). Internally we convert to bsptile's 0-based
+// desktop/screen indices at the boundary.
+type WindowRule struct {
+	Class    string `toml:"class"`              // required: regex for WM_CLASS
+	Name     string `toml:"name,omitempty"`     // optional: regex for WM_NAME
+	Floating bool   `toml:"floating,omitempty"` // true → leave unmanaged (same as window_ignore)
+	Tile     bool   `toml:"tile,omitempty"`     // true → force-tile even when IsFloating() would say no
+	Monitor  *int   `toml:"monitor,omitempty"`  // optional: send to this monitor (1-indexed)
+	Desktop  *int   `toml:"desktop,omitempty"`  // optional: send to this desktop (1-indexed)
+}
+
+// WorkspaceRule sets the initial state of one (or every) workspace on a given
+// desktop. Desktop and Screen are 1-indexed to match the xfwm UI.
+//
+// Anything you change at runtime (toggle, layout switch, …) still wins until
+// the daemon next restarts or reloads.
+type WorkspaceRule struct {
+	Desktop    int    `toml:"desktop"`              // required: 1-indexed desktop number
+	Screen     *int   `toml:"screen,omitempty"`     // optional: 1-indexed; absent = all screens
+	Tiling     *bool  `toml:"tiling,omitempty"`     // override tiling_enabled
+	Layout     string `toml:"layout,omitempty"`     // "bsp" | "maximized" | "fullscreen"
+	Decoration *bool  `toml:"decoration,omitempty"` // override window_decoration
 }
 
 type KeyBindings []string
