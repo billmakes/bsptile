@@ -420,6 +420,13 @@ func (tr *Tracker) handleResizeClient(c *store.Client) {
 		return
 	}
 
+	// Skip post-Tile ConfigureNotify echo. Without this, our own MoveResize
+	// calls inside tr.Tile bounce back here and either fight with the user's
+	// in-flight drag or trigger redundant retiles.
+	if tr.handlersMuted() {
+		return
+	}
+
 	// Previous dimensions
 	pGeom := c.Latest.Dimensions.Geometry
 	px, py, pw, ph := pGeom.Pieces()
@@ -435,36 +442,47 @@ func (tr *Tracker) handleResizeClient(c *store.Client) {
 	resized := cw != pw || ch != ph
 	moved := (cx != px || cy != py) && (cw == pw && ch == ph)
 
-	if resized && !moved && !tr.Handlers.MoveClient.Active() {
-		pt := store.PointerUpdate(store.X)
-
-		// Set client resize event
-		if !c.IsNew() && !tr.Handlers.ResizeClient.Active() {
-			tr.Handlers.ResizeClient = &Handler{Dragging: pt.Dragging(500), Source: c}
-		}
-		log.Debug("Client resize handler fired [", c.Latest.Class, "]")
-
-		if tr.Handlers.ResizeClient.Dragging {
-
-			// Set client resize lock
-			if tr.Handlers.ResizeClient.Active() {
-				tr.Handlers.ResizeClient.Source.(*store.Client).Lock()
-				log.Debug("Client resize handler active [", c.Latest.Class, "]")
-			}
-
-			// Update proportions
-			dir := &store.Directions{
-				Top:    cy != py,
-				Right:  cx+cw != px+pw,
-				Bottom: cy+ch != py+ph,
-				Left:   cx != px,
-			}
-			ws.ActiveLayout().UpdateProportions(c, dir, *common.CreateGeometry(cGeom))
-		}
-
-		// Tile workspace
-		tr.Tile(ws)
+	if !resized || moved || tr.Handlers.MoveClient.Active() {
+		return
 	}
+
+	pt := store.PointerUpdate(store.X)
+
+	// Set client resize event
+	if !c.IsNew() && !tr.Handlers.ResizeClient.Active() {
+		tr.Handlers.ResizeClient = &Handler{Dragging: pt.Dragging(500), Source: c}
+
+		// When a user-driven drag starts, drop the min-size hint we set during
+		// the last Tile (via c.Limit). Without this, xfwm honors the previous
+		// min-size and silently refuses to shrink the window — growing works
+		// but shrinking doesn't. The next Tile (on release) re-applies Limit
+		// at the new BSP-computed dimensions.
+		if tr.Handlers.ResizeClient.Dragging {
+			c.UnLimit()
+		}
+	}
+	log.Debug("Client resize handler fired [", c.Latest.Class, "]")
+
+	dir := &store.Directions{
+		Top:    cy != py,
+		Right:  cx+cw != px+pw,
+		Bottom: cy+ch != py+ph,
+		Left:   cx != px,
+	}
+
+	if tr.Handlers.ResizeClient.Dragging {
+		// User-driven drag (e.g. xfwm's Super+RightClick). Update BSP ratios
+		// continuously but let the WM own the dragged window's geometry —
+		// don't issue our own MoveResize while the drag is live or we end up
+		// racing the WM on the same window. The final Tile happens when the
+		// button is released (see onPointerUpdate).
+		ws.ActiveLayout().UpdateProportions(c, dir, *common.CreateGeometry(cGeom))
+		return
+	}
+
+	// Programmatic resize (no drag in flight): apply immediately.
+	ws.ActiveLayout().UpdateProportions(c, dir, *common.CreateGeometry(cGeom))
+	tr.Tile(ws)
 }
 
 func (tr *Tracker) handleMoveClient(c *store.Client) {
