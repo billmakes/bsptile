@@ -162,3 +162,49 @@ func TestBSPResizeUpdatesSharedBoundaries(t *testing.T) {
 		t.Fatalf("screen-edge resize changed root ratio to %v", root.Ratio)
 	}
 }
+
+func TestBSPDirectionProportionUsesNearestMatchingAncestor(t *testing.T) {
+	previousStep := common.Config.ProportionStep
+	previousMin := common.Config.ProportionMin
+	common.Config.ProportionStep = 0.1
+	common.Config.ProportionMin = 0.1
+	t.Cleanup(func() {
+		common.Config.ProportionStep = previousStep
+		common.Config.ProportionMin = previousMin
+	})
+
+	left := &Node{Client: testClient(1)}
+	topRight := &Node{Client: testClient(2)}
+	bottomRight := &Node{Client: testClient(3)}
+	right := &Node{
+		First:  topRight,
+		Second: bottomRight,
+		Split:  SplitHorizontal,
+		Ratio:  0.5,
+	}
+	root := &Node{
+		First:  left,
+		Second: right,
+		Split:  SplitVertical,
+		Ratio:  0.5,
+	}
+	left.Parent = root
+	right.Parent = root
+	topRight.Parent = right
+	bottomRight.Parent = right
+	mg := &Manager{Root: root}
+	Windows = &XWindows{Active: *bottomRight.Client.Window}
+
+	if !mg.DirectionProportion(common.Left) || root.Ratio != 0.4 {
+		t.Fatalf("left resize ratio = %v, want 0.4", root.Ratio)
+	}
+	if !mg.DirectionProportion(common.Right) || root.Ratio != 0.5 {
+		t.Fatalf("right resize ratio = %v, want 0.5", root.Ratio)
+	}
+	if !mg.DirectionProportion(common.Up) || right.Ratio != 0.4 {
+		t.Fatalf("up resize ratio = %v, want 0.4", right.Ratio)
+	}
+	if !mg.DirectionProportion(common.Down) || right.Ratio != 0.5 {
+		t.Fatalf("down resize ratio = %v, want 0.5", right.Ratio)
+	}
+}

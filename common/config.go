@@ -35,11 +35,13 @@ type Configuration struct {
 	DropTargetWidth   int                    `toml:"drop_target_width"`   // Outline width (px) of drop-target indicator
 	Colors            map[string][]int       `toml:"colors"`              // List of color values for gui elements
 	Keys              map[string]KeyBindings `toml:"keys"`                // Event bindings for keyboard shortcuts
+	Modes             map[string]Mode        `toml:"modes"`               // Alternate keyboard shortcut layers
 	Corners           map[string]string      `toml:"corners"`             // Event bindings for hot-corner actions
 	Systray           map[string]string      `toml:"systray"`             // Event bindings for systray icon
 }
 
 type KeyBindings []string
+type Mode map[string]KeyBindings
 
 func (keys *KeyBindings) UnmarshalTOML(value any) error {
 	switch value := value.(type) {
@@ -121,6 +123,14 @@ func readConfig(configFilePath string, initial bool) bool {
 		}
 		return false
 	}
+	if err := validateConfig(config); err != nil {
+		if initial {
+			log.Fatal("Error reading config file ", err)
+		} else {
+			log.Warn("Error updating config file ", err)
+		}
+		return false
+	}
 	Config = config
 
 	// Print shortcut infos
@@ -135,6 +145,19 @@ func readConfig(configFilePath string, initial bool) bool {
 	}
 
 	return true
+}
+
+func validateConfig(config Configuration) error {
+	for name, mode := range config.Modes {
+		if name == "" || name == "default" {
+			return fmt.Errorf("invalid key mode name %q", name)
+		}
+		if bindings := mode["mode_default"]; len(bindings) == 0 {
+			return fmt.Errorf("key mode %q must define mode_default", name)
+		}
+	}
+
+	return nil
 }
 
 func watchConfig(configFilePath string) {

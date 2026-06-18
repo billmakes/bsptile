@@ -349,6 +349,42 @@ func (mg *Manager) DecreaseProportion() {
 	mg.resizeActive(-common.Config.ProportionStep)
 }
 
+func (mg *Manager) DirectionProportion(direction common.Direction) bool {
+	leaf := mg.activeNode()
+	if leaf == nil {
+		return false
+	}
+
+	split := SplitVertical
+	delta := common.Config.ProportionStep
+	switch direction {
+	case common.Left:
+		delta = -delta
+	case common.Right:
+	case common.Up:
+		split = SplitHorizontal
+		delta = -delta
+	case common.Down:
+		split = SplitHorizontal
+	default:
+		return false
+	}
+
+	for node := leaf.Parent; node != nil; node = node.Parent {
+		if node.Split != split {
+			continue
+		}
+		ratio := clampRatio(node.Ratio + delta)
+		if ratio == node.Ratio {
+			return false
+		}
+		node.Ratio = ratio
+		return true
+	}
+
+	return false
+}
+
 func (mg *Manager) resizeActive(delta float64) {
 	leaf := mg.activeNode()
 	if leaf == nil || leaf.Parent == nil {

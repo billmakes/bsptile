@@ -10,7 +10,8 @@ import (
 
 func TestKeyBindingsDecodeStringAndArray(t *testing.T) {
 	var config struct {
-		Keys map[string]KeyBindings `toml:"keys"`
+		Keys  map[string]KeyBindings `toml:"keys"`
+		Modes map[string]Mode        `toml:"modes"`
 	}
 
 	_, err := toml.Decode(`
@@ -18,6 +19,10 @@ func TestKeyBindingsDecodeStringAndArray(t *testing.T) {
 single = "Control-A"
 multiple = ["Control-B", "Mod4-B"]
 empty = ""
+
+[modes.resize]
+mode_default = ["Escape", "Return"]
+increase = "Right"
 `, &config)
 	if err != nil {
 		t.Fatal(err)
@@ -30,6 +35,14 @@ empty = ""
 	}
 	if !reflect.DeepEqual(config.Keys, expected) {
 		t.Fatalf("unexpected bindings: %#v", config.Keys)
+	}
+
+	expectedMode := Mode{
+		"mode_default": {"Escape", "Return"},
+		"increase":     {"Right"},
+	}
+	if !reflect.DeepEqual(config.Modes["resize"], expectedMode) {
+		t.Fatalf("unexpected mode bindings: %#v", config.Modes["resize"])
 	}
 }
 
@@ -82,5 +95,24 @@ func TestReadConfigReplacesConfigOnlyAfterSuccessfulDecode(t *testing.T) {
 	}
 	if _, ok := Config.Keys["toggle"]; ok {
 		t.Fatal("removed binding survived config replacement")
+	}
+}
+
+func TestValidateConfigRequiresModeDefault(t *testing.T) {
+	config := Configuration{
+		Modes: map[string]Mode{
+			"resize": {
+				"proportion_increase": {"Right"},
+			},
+		},
+	}
+
+	if err := validateConfig(config); err == nil {
+		t.Fatal("expected mode without mode_default to be rejected")
+	}
+
+	config.Modes["resize"]["mode_default"] = KeyBindings{"Escape"}
+	if err := validateConfig(config); err != nil {
+		t.Fatalf("expected valid mode: %v", err)
 	}
 }

@@ -135,6 +135,9 @@ reset = "Control-Shift-BackSpace"
 # Reload the configuration file and keyboard shortcuts.
 reload = "Control-Shift-C"
 
+# Enter resize mode.
+mode_resize = "Mod4-Shift-r"
+
 # Rotate the BSP tree clockwise by 90 degrees.
 tree_rotate = "Mod4-r"
 
@@ -188,6 +191,19 @@ mod_screens = "Mod1"
 
 # Some commands above will affect all workspaces if this key is pressed in addition (Mod4 = Super_L).
 mod_workspaces = "Mod4"
+
+################################################################################
+[modes.resize]                         # Exact shortcuts active in resize mode. #
+################################################################################
+
+# Return to the default shortcut layer.
+mode_default = ["Escape", "Return"]
+
+# Move the nearest focused BSP split boundary in each direction.
+proportion_left = ["Mod4-h", "Mod4-Left"]
+proportion_down = ["Mod4-j", "Mod4-Down"]
+proportion_up = ["Mod4-k", "Mod4-Up"]
+proportion_right = ["Mod4-l", "Mod4-Right"]
 
 ################################################################################
 [corners]                                # Action strings from [keys] section. #

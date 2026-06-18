@@ -40,6 +40,10 @@ func ExecuteAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) bo
 	log.Info("Execute action ", action, " [", ws.Name, "]")
 
 	// Choose action command
+	if mode, ok := keyModeAction(action); ok {
+		success = SetKeyMode(mode, tr)
+		goto complete
+	}
 	switch action {
 	case "enable":
 		success = EnableTiling(tr, ws)
@@ -93,6 +97,14 @@ func ExecuteAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) bo
 		success = IncreaseProportion(tr, ws)
 	case "proportion_decrease":
 		success = DecreaseProportion(tr, ws)
+	case "proportion_up":
+		success = DirectionProportion(tr, ws, common.Up)
+	case "proportion_down":
+		success = DirectionProportion(tr, ws, common.Down)
+	case "proportion_left":
+		success = DirectionProportion(tr, ws, common.Left)
+	case "proportion_right":
+		success = DirectionProportion(tr, ws, common.Right)
 	case "reload":
 		success = ReloadConfig(tr)
 	case "restart":
@@ -102,6 +114,8 @@ func ExecuteAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) bo
 	default:
 		success = External(action)
 	}
+
+complete:
 	time.AfterFunc(100*time.Millisecond, tr.Handlers.Reset)
 
 	// Check success
@@ -640,6 +654,18 @@ func DecreaseProportion(tr *desktop.Tracker, ws *desktop.Workspace) bool {
 		return false
 	}
 	ws.ActiveLayout().DecreaseProportion()
+	tr.Tile(ws)
+
+	return true
+}
+
+func DirectionProportion(tr *desktop.Tracker, ws *desktop.Workspace, direction common.Direction) bool {
+	if ws.TilingDisabled() {
+		return false
+	}
+	if !ws.ActiveLayout().GetManager().DirectionProportion(direction) {
+		return false
+	}
 	tr.Tile(ws)
 
 	return true

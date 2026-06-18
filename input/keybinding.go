@@ -14,20 +14,47 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const defaultKeyMode = "default"
+
+var activeKeyMode = defaultKeyMode
+
 func BindKeys(tr *desktop.Tracker) {
 	keybind.Initialize(store.X)
-	bindConfiguredKeys(tr)
+	activeKeyMode = defaultKeyMode
+	bindDefaultKeys(tr)
 
 	// Bind action channel
 	go action(tr.Channels.Action, tr)
 }
 
 func ReloadKeys(tr *desktop.Tracker) {
-	keybind.Detach(store.X, store.X.RootWin())
-	bindConfiguredKeys(tr)
+	setKeyMode(defaultKeyMode, tr)
 }
 
-func bindConfiguredKeys(tr *desktop.Tracker) {
+func SetKeyMode(mode string, tr *desktop.Tracker) bool {
+	if mode != defaultKeyMode {
+		if _, ok := common.Config.Modes[mode]; !ok {
+			log.Warn("Unknown key mode ", mode)
+			return false
+		}
+	}
+
+	setKeyMode(mode, tr)
+	log.Info("Key mode ", mode)
+	return true
+}
+
+func setKeyMode(mode string, tr *desktop.Tracker) {
+	keybind.Detach(store.X, store.X.RootWin())
+	activeKeyMode = mode
+	if mode == defaultKeyMode {
+		bindDefaultKeys(tr)
+		return
+	}
+	bindModeKeys(common.Config.Modes[mode], tr)
+}
+
+func bindDefaultKeys(tr *desktop.Tracker) {
 	actions := map[string]common.KeyBindings{}
 	mods := map[string]common.KeyBindings{"current": {""}}
 
@@ -60,6 +87,26 @@ func bindConfiguredKeys(tr *desktop.Tracker) {
 			}
 		}
 	}
+}
+
+func bindModeKeys(mode common.Mode, tr *desktop.Tracker) {
+	for action, keys := range mode {
+		for _, key := range keys {
+			if key != "" {
+				bind(key, action, "current", tr)
+			}
+		}
+	}
+}
+
+func keyModeAction(action string) (string, bool) {
+	if action == "mode_default" {
+		return defaultKeyMode, true
+	}
+	if strings.HasPrefix(action, "mode_") && len(action) > len("mode_") {
+		return strings.TrimPrefix(action, "mode_"), true
+	}
+	return "", false
 }
 
 func bind(key string, action string, mod string, tr *desktop.Tracker) {

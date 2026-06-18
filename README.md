@@ -73,6 +73,7 @@ Default keyboard shortcuts:
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>           | Disable tiling and restore windows              |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>BackSpace</kbd>   | Reset BSP split ratios                          |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd>           | Reload configuration and keyboard shortcuts     |
+| <kbd>Mod4</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>           | Enter resize mode                               |
 | <kbd>Mod4</kbd>+<kbd>E</kbd>                            | Return to BSP tiling mode                       |
 | <kbd>Mod4</kbd>+<kbd>Alt</kbd>+<kbd>Space</kbd>         | Activate maximized layout                       |
 | <kbd>Mod4</kbd>+<kbd>F</kbd>                            | Activate fullscreen layout                      |
@@ -82,6 +83,25 @@ Default keyboard shortcuts:
 | <kbd>Mod4</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd>         | Focus previous window                           |
 | <kbd>Mod4</kbd>+<kbd>+</kbd>                            | Increase the focused BSP split ratio            |
 | <kbd>Mod4</kbd>+<kbd>-</kbd>                            | Decrease the focused BSP split ratio            |
+
+### Key modes
+
+Actions named `mode_<name>` switch to the matching `[modes.<name>]` shortcut
+layer. Mode shortcuts are exact bindings and do not inherit `mod_screens` or
+`mod_workspaces`. Every mode must define `mode_default` so there is always a
+binding that returns to the normal `[keys]` layer.
+
+```toml
+[keys]
+mode_resize = "Mod4-Shift-r"
+
+[modes.resize]
+mode_default = ["Escape", "Return"]
+proportion_left = ["Mod4-h", "Mod4-Left"]
+proportion_down = ["Mod4-j", "Mod4-Down"]
+proportion_up = ["Mod4-k", "Mod4-Up"]
+proportion_right = ["Mod4-l", "Mod4-Right"]
+```
 
 Hot corner events (configured under `[corners]`):
 | Corner                             | Description                          |
