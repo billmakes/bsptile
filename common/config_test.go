@@ -11,6 +11,7 @@ import (
 func TestKeyBindingsDecodeStringAndArray(t *testing.T) {
 	var config struct {
 		Keys  map[string]KeyBindings `toml:"keys"`
+		Mouse map[string]KeyBindings `toml:"mouse"`
 		Modes map[string]Mode        `toml:"modes"`
 	}
 
@@ -19,6 +20,10 @@ func TestKeyBindingsDecodeStringAndArray(t *testing.T) {
 single = "Control-A"
 multiple = ["Control-B", "Mod4-B"]
 empty = ""
+
+[mouse]
+window_next = "Button8"
+window_previous = ["Button9", "Mod4-Button9"]
 
 [modes.resize]
 mode_default = ["Escape", "Return"]
@@ -35,6 +40,14 @@ increase = "Right"
 	}
 	if !reflect.DeepEqual(config.Keys, expected) {
 		t.Fatalf("unexpected bindings: %#v", config.Keys)
+	}
+
+	expectedMouse := map[string]KeyBindings{
+		"window_next":     {"Button8"},
+		"window_previous": {"Button9", "Mod4-Button9"},
+	}
+	if !reflect.DeepEqual(config.Mouse, expectedMouse) {
+		t.Fatalf("unexpected mouse bindings: %#v", config.Mouse)
 	}
 
 	expectedMode := Mode{
