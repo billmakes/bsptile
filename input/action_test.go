@@ -59,6 +59,24 @@ func TestDirectionWorkspaceClientPrefersPerpendicularOverlap(t *testing.T) {
 	}
 }
 
+func TestDirectionWorkspaceClientPrefersNearbyDiagonalOverFarAligned(t *testing.T) {
+	source := directionTestClient(1, common.Geometry{X: 1000, Y: 500, Width: 400, Height: 400})
+	nearDiagonal := directionTestClient(2, common.Geometry{X: 500, Y: 100, Width: 400, Height: 300})
+	farAligned := directionTestClient(3, common.Geometry{X: -1000, Y: 500, Width: 400, Height: 400})
+
+	manager := store.CreateBSPManager(store.Location{})
+	manager.AddClient(farAligned)
+	store.Windows = &store.XWindows{Active: *farAligned.Window}
+	manager.AddClient(nearDiagonal)
+	target := &desktop.Workspace{
+		Layouts: []desktop.Layout{layout.CreateBSPLayout(manager)},
+	}
+
+	if selected := DirectionWorkspaceClient(source, target, common.Left); selected != nearDiagonal {
+		t.Fatalf("left target = %v, want nearby diagonal window", selected)
+	}
+}
+
 func TestShouldWarpPointerRequiresConfigAndPointerInsideClient(t *testing.T) {
 	previousConfig := common.Config.WindowPointerWarp
 	previousPointer := store.Pointer

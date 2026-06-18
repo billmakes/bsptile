@@ -153,7 +153,7 @@ const (
 )
 
 type DirectionScore struct {
-	Beam      bool
+	Distance  int
 	Primary   int
 	Secondary int
 }
@@ -169,40 +169,45 @@ func ScoreDirection(source Geometry, target Geometry, direction Direction) (Dire
 		if dy >= 0 {
 			return score, false
 		}
-		score.Beam = intervalsOverlap(source.X, source.X+source.Width, target.X, target.X+target.Width)
 		score.Primary = MaxInt(source.Y-(target.Y+target.Height), 0)
-		score.Secondary = AbsInt(dx)
+		score.Secondary = intervalGap(source.X, source.X+source.Width, target.X, target.X+target.Width)
 	case Down:
 		if dy <= 0 {
 			return score, false
 		}
-		score.Beam = intervalsOverlap(source.X, source.X+source.Width, target.X, target.X+target.Width)
 		score.Primary = MaxInt(target.Y-(source.Y+source.Height), 0)
-		score.Secondary = AbsInt(dx)
+		score.Secondary = intervalGap(source.X, source.X+source.Width, target.X, target.X+target.Width)
 	case Left:
 		if dx >= 0 {
 			return score, false
 		}
-		score.Beam = intervalsOverlap(source.Y, source.Y+source.Height, target.Y, target.Y+target.Height)
 		score.Primary = MaxInt(source.X-(target.X+target.Width), 0)
-		score.Secondary = AbsInt(dy)
+		score.Secondary = intervalGap(source.Y, source.Y+source.Height, target.Y, target.Y+target.Height)
 	case Right:
 		if dx <= 0 {
 			return score, false
 		}
-		score.Beam = intervalsOverlap(source.Y, source.Y+source.Height, target.Y, target.Y+target.Height)
 		score.Primary = MaxInt(target.X-(source.X+source.Width), 0)
-		score.Secondary = AbsInt(dy)
+		score.Secondary = intervalGap(source.Y, source.Y+source.Height, target.Y, target.Y+target.Height)
 	default:
 		return score, false
+	}
+
+	score.Distance = score.Primary + score.Secondary
+	// Center alignment provides deterministic ordering when rectangle-edge
+	// distances are otherwise identical.
+	if direction == Up || direction == Down {
+		score.Secondary = AbsInt(dx)
+	} else {
+		score.Secondary = AbsInt(dy)
 	}
 
 	return score, true
 }
 
 func BetterDirectionScore(candidate DirectionScore, current DirectionScore) bool {
-	if candidate.Beam != current.Beam {
-		return candidate.Beam
+	if candidate.Distance != current.Distance {
+		return candidate.Distance < current.Distance
 	}
 	if candidate.Primary != current.Primary {
 		return candidate.Primary < current.Primary
@@ -210,8 +215,14 @@ func BetterDirectionScore(candidate DirectionScore, current DirectionScore) bool
 	return candidate.Secondary < current.Secondary
 }
 
-func intervalsOverlap(aStart int, aEnd int, bStart int, bEnd int) bool {
-	return aStart < bEnd && bStart < aEnd
+func intervalGap(aStart int, aEnd int, bStart int, bEnd int) int {
+	if aEnd < bStart {
+		return bStart - aEnd
+	}
+	if bEnd < aStart {
+		return aStart - bEnd
+	}
+	return 0
 }
 
 func AbsInt(n int) int {

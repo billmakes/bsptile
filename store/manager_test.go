@@ -261,6 +261,32 @@ func TestDirectionClientPrefersPerpendicularOverlap(t *testing.T) {
 	}
 }
 
+func TestDirectionClientPrefersNearbyDiagonalOverFarAligned(t *testing.T) {
+	active := testClient(1)
+	nearDiagonal := testClient(2)
+	farAligned := testClient(3)
+	active.Latest.Dimensions.Geometry = common.Geometry{X: 1000, Y: 500, Width: 400, Height: 400}
+	nearDiagonal.Latest.Dimensions.Geometry = common.Geometry{X: 500, Y: 100, Width: 400, Height: 300}
+	farAligned.Latest.Dimensions.Geometry = common.Geometry{X: -1000, Y: 500, Width: 400, Height: 400}
+
+	activeNode := &Node{Client: active}
+	nearNode := &Node{Client: nearDiagonal}
+	farNode := &Node{Client: farAligned}
+	left := &Node{First: farNode, Second: nearNode}
+	root := &Node{First: left, Second: activeNode}
+	farNode.Parent = left
+	nearNode.Parent = left
+	left.Parent = root
+	activeNode.Parent = root
+
+	mg := &Manager{Root: root}
+	Windows = &XWindows{Active: *active.Window}
+
+	if target := mg.DirectionClient(common.Left); target != nearDiagonal {
+		t.Fatalf("left target = %v, want nearby diagonal window", target)
+	}
+}
+
 func TestDirectionClientUsesSynchronousLeafBoundsAfterSwap(t *testing.T) {
 	left := &Node{
 		Client: testClient(1),
