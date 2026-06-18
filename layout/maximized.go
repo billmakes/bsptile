@@ -1,0 +1,63 @@
+package layout
+
+import (
+	"math"
+
+	"github.com/billmakes/bsptile/v2/common"
+	"github.com/billmakes/bsptile/v2/store"
+
+	log "github.com/sirupsen/logrus"
+)
+
+type MaximizedLayout struct {
+	Name           string // Layout name
+	*store.Manager        // Layout store manager
+}
+
+func CreateMaximizedLayout(manager *store.Manager) *MaximizedLayout {
+	layout := &MaximizedLayout{
+		Name:    "maximized",
+		Manager: manager,
+	}
+	layout.Reset()
+	return layout
+}
+
+func (l *MaximizedLayout) Reset() {
+	l.Manager.Reset()
+}
+
+func (l *MaximizedLayout) Apply() {
+	clients := l.Clients(store.Stacked)
+
+	dx, dy, dw, dh := store.DesktopGeometry(l.Location.Screen).Pieces()
+	gap := common.Config.WindowGapSize
+
+	csize := len(clients)
+
+	log.Info("Tile ", csize, " windows with ", l.Name, " layout [workspace-", l.Location.Desktop, "-", l.Location.Screen, "]")
+
+	// Main area layout
+	for _, c := range clients {
+
+		// Limit minimum dimensions
+		minw := int(math.Round(float64(dw - 2*gap)))
+		minh := int(math.Round(float64(dh - 2*gap)))
+		c.Limit(minw, minh)
+
+		// Move and resize client
+		c.MoveWindow(dx+gap, dy+gap, dw-2*gap, dh-2*gap)
+	}
+}
+
+func (l *MaximizedLayout) UpdateProportions(c *store.Client, d *store.Directions, geom common.Geometry) {
+	l.Reset()
+}
+
+func (l *MaximizedLayout) GetManager() *store.Manager {
+	return l.Manager
+}
+
+func (l *MaximizedLayout) GetName() string {
+	return l.Name
+}
