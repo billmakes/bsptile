@@ -53,6 +53,10 @@ func CreateCorners(screens []XHead) []*Corner {
 	return corners
 }
 
+func ReloadCorners() {
+	Workplace.Displays.Corners = CreateCorners(Workplace.Displays.Screens)
+}
+
 func (c *Corner) IsActive(p *XPointer) bool {
 
 	// Check if pointer is inside rectangle

@@ -82,6 +82,10 @@ func InitConfig() {
 	watchConfig(Args.Config)
 }
 
+func ReloadConfig() bool {
+	return readConfig(Args.Config, false)
+}
+
 func ConfigFolderPath(name string) string {
 
 	// Obtain user config directory
@@ -93,7 +97,7 @@ func ConfigFolderPath(name string) string {
 	return filepath.Join(userConfigDir, name)
 }
 
-func readConfig(configFilePath string, initial bool) {
+func readConfig(configFilePath string, initial bool) bool {
 
 	// Print runtime infos
 	if initial {
@@ -105,15 +109,19 @@ func readConfig(configFilePath string, initial bool) {
 		fmt.Printf("FILES: \n  log: %s\n  lock: %s\n  cache: %s\n  config: %s\n\n", Args.Log, Args.Lock, Args.Cache, configFilePath)
 	}
 
-	// Decode config file into struct
-	_, err := toml.DecodeFile(configFilePath, &Config)
+	// Decode into a temporary value so an invalid file cannot partially update
+	// the running configuration.
+	var config Configuration
+	_, err := toml.DecodeFile(configFilePath, &config)
 	if err != nil {
 		if initial {
 			log.Fatal("Error reading config file ", err)
 		} else {
 			log.Warn("Error updating config file ", err)
 		}
+		return false
 	}
+	Config = config
 
 	// Print shortcut infos
 	if initial {
@@ -125,6 +133,8 @@ func readConfig(configFilePath string, initial bool) {
 		fmt.Printf("CORNERS: %s\n", RemoveChars(string(corners), []string{"{", "}", "\"", ","}))
 		fmt.Printf("SYSTRAY: %s\n", RemoveChars(string(systray), []string{"{", "}", "\"", ","}))
 	}
+
+	return true
 }
 
 func watchConfig(configFilePath string) {

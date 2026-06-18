@@ -72,6 +72,7 @@ Default keyboard shortcuts:
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>           | Toggle window decoration on and off             |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>           | Disable tiling and restore windows              |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>BackSpace</kbd>   | Reset BSP split ratios                          |
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd>           | Reload configuration and keyboard shortcuts     |
 | <kbd>Mod4</kbd>+<kbd>E</kbd>                            | Return to BSP tiling mode                       |
 | <kbd>Mod4</kbd>+<kbd>Alt</kbd>+<kbd>Space</kbd>         | Activate maximized layout                       |
 | <kbd>Mod4</kbd>+<kbd>F</kbd>                            | Activate fullscreen layout                      |

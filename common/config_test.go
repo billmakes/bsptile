@@ -46,3 +46,41 @@ func TestConfigFilesDecode(t *testing.T) {
 		}
 	}
 }
+
+func TestReadConfigReplacesConfigOnlyAfterSuccessfulDecode(t *testing.T) {
+	path := t.TempDir() + "/config.toml"
+	previous := Config
+	t.Cleanup(func() {
+		Config = previous
+	})
+
+	if err := os.WriteFile(path, []byte("[keys]\ntoggle = \"Control-T\"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if !readConfig(path, false) {
+		t.Fatal("expected valid config to load")
+	}
+	if _, ok := Config.Keys["toggle"]; !ok {
+		t.Fatal("expected toggle binding")
+	}
+
+	if err := os.WriteFile(path, []byte("[keys]\ninvalid = [\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if readConfig(path, false) {
+		t.Fatal("expected invalid config to be rejected")
+	}
+	if _, ok := Config.Keys["toggle"]; !ok {
+		t.Fatal("invalid reload changed the running config")
+	}
+
+	if err := os.WriteFile(path, []byte("[keys]\nreload = \"Control-C\"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if !readConfig(path, false) {
+		t.Fatal("expected replacement config to load")
+	}
+	if _, ok := Config.Keys["toggle"]; ok {
+		t.Fatal("removed binding survived config replacement")
+	}
+}

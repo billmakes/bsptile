@@ -16,7 +16,18 @@ import (
 
 func BindKeys(tr *desktop.Tracker) {
 	keybind.Initialize(store.X)
+	bindConfiguredKeys(tr)
 
+	// Bind action channel
+	go action(tr.Channels.Action, tr)
+}
+
+func ReloadKeys(tr *desktop.Tracker) {
+	keybind.Detach(store.X, store.X.RootWin())
+	bindConfiguredKeys(tr)
+}
+
+func bindConfiguredKeys(tr *desktop.Tracker) {
 	actions := map[string]common.KeyBindings{}
 	mods := map[string]common.KeyBindings{"current": {""}}
 
@@ -49,9 +60,6 @@ func BindKeys(tr *desktop.Tracker) {
 			}
 		}
 	}
-
-	// Bind action channel
-	go action(tr.Channels.Action, tr)
 }
 
 func bind(key string, action string, mod string, tr *desktop.Tracker) {

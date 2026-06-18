@@ -93,6 +93,8 @@ func ExecuteAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) bo
 		success = IncreaseProportion(tr, ws)
 	case "proportion_decrease":
 		success = DecreaseProportion(tr, ws)
+	case "reload":
+		success = ReloadConfig(tr)
 	case "restart":
 		success = Restart(tr)
 	case "exit":
@@ -640,6 +642,27 @@ func DecreaseProportion(tr *desktop.Tracker, ws *desktop.Workspace) bool {
 	ws.ActiveLayout().DecreaseProportion()
 	tr.Tile(ws)
 
+	return true
+}
+
+func ReloadConfig(tr *desktop.Tracker) bool {
+	if !common.ReloadConfig() {
+		return false
+	}
+
+	ReloadKeys(tr)
+	store.ReloadCorners()
+
+	for _, ws := range tr.Workspaces {
+		for _, layout := range ws.Layouts {
+			layout.GetManager().Decoration = common.Config.WindowDecoration
+		}
+		if ws.TilingEnabled() {
+			tr.Tile(ws)
+		}
+	}
+
+	log.Info("Reload config")
 	return true
 }
 

@@ -132,6 +132,9 @@ restore = "Control-Shift-R"
 # Reset BSP split ratios (BackSpace = Delete_Left).
 reset = "Control-Shift-BackSpace"
 
+# Reload the configuration file and keyboard shortcuts.
+reload = "Control-Shift-C"
+
 # Rotate the BSP tree clockwise by 90 degrees.
 tree_rotate = "Mod4-r"
 
