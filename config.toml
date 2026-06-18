@@ -275,6 +275,7 @@ scroll_right = "proportion_increase"
 #   class    = RE2 regex for WM_CLASS (required)                               #
 #   name     = RE2 regex for WM_NAME (optional)                                #
 #   floating = true → leave unmanaged (same shape as window_ignore)            #
+#   sticky   = true → leave unmanaged, always on top, on every desktop         #
 #   tile     = true → force-tile even when IsFloating would say no             #
 #   monitor  = 1-indexed monitor number to send the window to                  #
 #   desktop  = 1-indexed desktop number to send the window to                  #
@@ -285,6 +286,10 @@ scroll_right = "proportion_increase"
 # [[window_rules]]
 # class = "Pavucontrol"
 # floating = true
+#
+# [[window_rules]]
+# class = "Galculator"
+# sticky = true
 #
 # [[window_rules]]
 # class = "Firefox"

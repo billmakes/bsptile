@@ -74,6 +74,8 @@ when an external hotkey daemon such as sxhkd invokes actions through IPC.
 Dialogs and eligible unmanaged/floating windows are kept above tiled windows by
 default. Set `window_floating_above = false` to leave their stacking entirely
 to the window manager.
+Window rules support `sticky = true` to leave a matching window unmanaged,
+always on top, and visible on every workspace.
 
 ### Shortcuts
 Default keyboard shortcuts:

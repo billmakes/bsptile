@@ -54,6 +54,7 @@ type WindowRule struct {
 	Class    string `toml:"class"`              // required: regex for WM_CLASS
 	Name     string `toml:"name,omitempty"`     // optional: regex for WM_NAME
 	Floating bool   `toml:"floating,omitempty"` // true → leave unmanaged (same as window_ignore)
+	Sticky   bool   `toml:"sticky,omitempty"`   // true → float above and show on every desktop
 	Tile     bool   `toml:"tile,omitempty"`     // true → force-tile even when IsFloating() would say no
 	Monitor  *int   `toml:"monitor,omitempty"`  // optional: send to this monitor (1-indexed)
 	Desktop  *int   `toml:"desktop,omitempty"`  // optional: send to this desktop (1-indexed)

@@ -13,7 +13,7 @@ func setConfigRules(t *testing.T, window []WindowRule, workspace []WorkspaceRule
 	Config.WorkspaceRules = workspace
 }
 
-func ptrInt(v int) *int   { return &v }
+func ptrInt(v int) *int    { return &v }
 func ptrBool(v bool) *bool { return &v }
 
 func TestMatchWindowRuleFirstMatchWins(t *testing.T) {
@@ -35,6 +35,7 @@ func TestMatchWindowRuleFirstMatchWins(t *testing.T) {
 func TestMatchWindowRuleNameNarrowsMatch(t *testing.T) {
 	setConfigRules(t, []WindowRule{
 		{Class: "Steam", Name: "^Friends List$", Floating: true},
+		{Class: "Calculator", Sticky: true},
 		{Class: "Steam", Tile: true},
 	}, nil)
 
@@ -43,6 +44,9 @@ func TestMatchWindowRuleNameNarrowsMatch(t *testing.T) {
 	}
 	if r := MatchWindowRule("Steam", "Library"); r == nil || !r.Tile {
 		t.Fatalf("class-only fallback did not match: %+v", r)
+	}
+	if r := MatchWindowRule("Calculator", "Calculator"); r == nil || !r.Sticky {
+		t.Fatalf("sticky rule did not match: %+v", r)
 	}
 }
 

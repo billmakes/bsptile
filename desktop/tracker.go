@@ -125,10 +125,16 @@ func (tr *Tracker) Update() {
 		info := store.GetInfo(w.Id)
 		trackable[w.Id] = !store.IsSpecial(info) && !store.IsIgnored(info)
 
-		// window_rule overrides: floating=true forces untrack, tile=true
-		// forces track (still respecting the hard IsSpecial block).
+		// Window-rule overrides. Sticky implies floating because XFWM owns
+		// sticky placement across desktops; bsptile must not tile the window.
 		if rule := common.MatchWindowRule(info.Class, info.Name); rule != nil {
+			if (rule.Sticky || rule.Floating) && (rule.Monitor != nil || rule.Desktop != nil) {
+				applyWindowRulePlacement(store.CreateClient(w.Id), rule)
+			}
 			switch {
+			case rule.Sticky:
+				trackable[w.Id] = false
+				store.SetSticky(w.Id)
 			case rule.Floating:
 				trackable[w.Id] = false
 			case rule.Tile:
@@ -338,7 +344,7 @@ func (tr *Tracker) trackWindow(w xproto.Window) bool {
 
 	// Apply window_rule placement (monitor/desktop) before workspace lookup
 	// so AddClient lands the new client on the right BSP tree the first time.
-	applyWindowRulePlacement(c)
+	applyWindowRulePlacement(c, common.MatchWindowRule(c.Latest.Class, c.Latest.Name))
 
 	ws := tr.ClientWorkspace(c)
 	if ws == nil {
@@ -359,21 +365,21 @@ func (tr *Tracker) trackWindow(w xproto.Window) bool {
 // applyWindowRulePlacement consults the matching window_rule (if any) and
 // moves the client to its declared monitor/desktop before the workspace
 // lookup. Monitor and Desktop in the rule are 1-indexed.
-func applyWindowRulePlacement(c *store.Client) {
-	rule := common.MatchWindowRule(c.Latest.Class, c.Latest.Name)
+func applyWindowRulePlacement(c *store.Client, rule *common.WindowRule) {
 	if rule == nil {
 		return
 	}
 	if rule.Monitor != nil {
 		idx := uint(*rule.Monitor - 1)
-		if idx < store.Workplace.ScreenCount {
+		if idx < store.Workplace.ScreenCount && c.Latest.Location.Screen != idx {
 			c.Latest.Location.Screen = idx
 			c.MoveToScreenDirect(uint32(idx))
 		}
 	}
-	if rule.Desktop != nil {
+	// Sticky means all desktops, so an explicit desktop cannot also apply.
+	if rule.Desktop != nil && !rule.Sticky {
 		idx := uint(*rule.Desktop - 1)
-		if idx < store.Workplace.DesktopCount {
+		if idx < store.Workplace.DesktopCount && c.Latest.Location.Desktop != idx {
 			c.Latest.Location.Desktop = idx
 			c.MoveToDesktop(uint32(idx))
 		}

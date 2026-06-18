@@ -481,6 +481,35 @@ func IsSticky(info *Info) bool {
 	return common.IsInList("_NET_WM_STATE_STICKY", info.States)
 }
 
+func SetSticky(window xproto.Window) bool {
+	info := GetInfo(window)
+	changed := false
+
+	if !IsSticky(info) {
+		if err := ewmh.WmStateReq(X, window, ewmh.StateAdd, "_NET_WM_STATE_STICKY"); err != nil {
+			log.Warn("Error setting window sticky [", info.Class, "]: ", err)
+			return false
+		}
+		changed = true
+	}
+
+	if !IsAbove(info) {
+		if err := ewmh.WmStateReq(X, window, ewmh.StateAdd, "_NET_WM_STATE_ABOVE"); err != nil {
+			log.Warn("Error setting sticky window above [", info.Class, "]: ", err)
+			return changed
+		}
+		changed = true
+	}
+
+	desktop := ^uint32(0)
+	if err := ewmh.WmDesktopSet(X, window, uint(desktop)); err != nil {
+		log.Warn("Error assigning sticky window to all desktops [", info.Class, "]: ", err)
+		return changed
+	}
+	ewmh.ClientEvent(X, window, "_NET_WM_DESKTOP", int(desktop), int(2))
+	return changed
+}
+
 func GetInfo(w xproto.Window) *Info {
 	var err error
 
