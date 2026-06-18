@@ -3,7 +3,7 @@ Description=window tiling manager
 After=graphical.target
 
 [Service]
-ExecStart=/usr/local/bin/cortile
+ExecStart=/usr/local/bin/bsptile
 Restart=always
 
 [Install]

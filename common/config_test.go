@@ -35,7 +35,7 @@ empty = ""
 
 func TestConfigFilesDecode(t *testing.T) {
 	paths := []string{"../config.toml"}
-	if path := os.Getenv("CORTILE_TEST_CONFIG"); path != "" {
+	if path := os.Getenv("BSPTILE_TEST_CONFIG"); path != "" {
 		paths = append(paths, path)
 	}
 

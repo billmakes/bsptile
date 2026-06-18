@@ -28,26 +28,20 @@ func (l *MaximizedLayout) Reset() {
 }
 
 func (l *MaximizedLayout) Apply() {
-	clients := l.Clients(store.Stacked)
+	active := l.ActiveClient()
+	if active == nil {
+		return
+	}
 
 	dx, dy, dw, dh := store.DesktopGeometry(l.Location.Screen).Pieces()
 	gap := common.Config.WindowGapSize
 
-	csize := len(clients)
+	log.Info("Tile active window with ", l.Name, " layout [workspace-", l.Location.Desktop, "-", l.Location.Screen, "]")
 
-	log.Info("Tile ", csize, " windows with ", l.Name, " layout [workspace-", l.Location.Desktop, "-", l.Location.Screen, "]")
-
-	// Main area layout
-	for _, c := range clients {
-
-		// Limit minimum dimensions
-		minw := int(math.Round(float64(dw - 2*gap)))
-		minh := int(math.Round(float64(dh - 2*gap)))
-		c.Limit(minw, minh)
-
-		// Move and resize client
-		c.MoveWindow(dx+gap, dy+gap, dw-2*gap, dh-2*gap)
-	}
+	minw := int(math.Round(float64(dw - 2*gap)))
+	minh := int(math.Round(float64(dh - 2*gap)))
+	active.Limit(minw, minh)
+	active.MoveWindow(dx+gap, dy+gap, dw-2*gap, dh-2*gap)
 }
 
 func (l *MaximizedLayout) UpdateProportions(c *store.Client, d *store.Directions, geom common.Geometry) {

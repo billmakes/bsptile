@@ -211,6 +211,24 @@ func (c *Client) MoveToScreenDirect(screen uint32) bool {
 	return true
 }
 
+func (c *Client) CenterOnScreen() bool {
+	screen := c.Latest.Location.Screen
+	if int(screen) >= len(Workplace.Displays.Screens) {
+		log.Warn("Center: screen index out of range [", c.Latest.Class, " screen=", screen, "]")
+		return false
+	}
+	geom := Workplace.Displays.Screens[screen].Geometry
+	_, _, w, h := c.OuterGeometry()
+	x := geom.Center().X - w/2
+	y := geom.Center().Y - h/2
+	log.Info("Center window [", c.Latest.Class, "] to ", x, ",", y, " (screen ", screen, " center ", geom.Center(), ", size ", w, "x", h, ")")
+	if err := ewmh.MoveWindow(X, c.Window.Id, x, y); err != nil {
+		log.Warn("Error centering window: ", err)
+		return false
+	}
+	return true
+}
+
 func (c *Client) MoveWindow(x, y, w, h int) {
 	if c.Locked {
 		log.Info("Reject window move/resize [", c.Latest.Class, "]")
@@ -418,6 +436,10 @@ func IsMaximized(info *Info) bool {
 
 func IsMinimized(info *Info) bool {
 	return common.IsInList("_NET_WM_STATE_HIDDEN", info.States)
+}
+
+func IsAbove(info *Info) bool {
+	return common.IsInList("_NET_WM_STATE_ABOVE", info.States)
 }
 
 func IsSticky(info *Info) bool {

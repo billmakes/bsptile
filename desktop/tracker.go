@@ -101,7 +101,13 @@ func (tr *Tracker) Update() {
 	// Remove untrackable windows
 	for w := range tr.Clients {
 		if !trackable[w] {
+			c := tr.Clients[w]
+			above := store.IsAbove(store.GetInfo(w))
 			tr.untrackWindow(w)
+			if above {
+				log.Info("Centering newly-above window [", c.Latest.Class, "]")
+				c.CenterOnScreen()
+			}
 		}
 	}
 

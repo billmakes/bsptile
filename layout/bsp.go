@@ -23,6 +23,9 @@ func (l *BSPLayout) Reset() {
 }
 
 func (l *BSPLayout) Apply() {
+	for _, c := range l.Clients(store.Stacked) {
+		c.UnFullscreen()
+	}
 	geom := *store.DesktopGeometry(l.Location.Screen)
 	log.Info("Tile ", len(l.Clients(store.Stacked)), " windows with BSP layout [workspace-",
 		l.Location.Desktop, "-", l.Location.Screen, "]")

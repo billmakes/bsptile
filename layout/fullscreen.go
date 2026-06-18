@@ -29,24 +29,22 @@ func (l *FullscreenLayout) Reset() {
 
 func (l *FullscreenLayout) Apply() {
 	clients := l.Clients(store.Ordered)
+	active := l.ActiveClient()
 
 	_, _, dw, dh := store.ScreenGeometry(l.Location.Screen).Pieces()
 
-	csize := len(clients)
+	log.Info("Tile ", len(clients), " windows with ", l.Name, " layout [workspace-", l.Location.Desktop, "-", l.Location.Screen, "]")
 
-	log.Info("Tile ", csize, " windows with ", l.Name, " layout [workspace-", l.Location.Desktop, "-", l.Location.Screen, "]")
-
-	// Main area layout
 	for _, c := range clients {
-
-		// Limit minimum dimensions
-		minw := int(math.Round(float64(dw)))
-		minh := int(math.Round(float64(dh)))
-		c.Limit(minw, minh)
-
-		// Make window fullscreen
-		c.Fullscreen()
-		c.Update()
+		if active != nil && c.Window.Id == active.Window.Id {
+			minw := int(math.Round(float64(dw)))
+			minh := int(math.Round(float64(dh)))
+			c.Limit(minw, minh)
+			c.Fullscreen()
+			c.Update()
+		} else {
+			c.UnFullscreen()
+		}
 	}
 }
 
