@@ -225,14 +225,14 @@ func (tr *Tracker) ActiveClient() *store.Client {
 
 func (tr *Tracker) RefreshActiveClient() *store.Client {
 	if focused, ok := store.InputFocusGet(store.X); ok {
-		if c := tr.clientForWindow(focused); c != nil {
+		if c := tr.ClientForWindow(focused); c != nil {
 			store.ActiveWindowUpdate(c.Window)
 			return c
 		}
 	}
 
 	active := store.ActiveWindowGet(store.X)
-	if c := tr.clientForWindow(active); c != nil {
+	if c := tr.ClientForWindow(active); c != nil {
 		store.ActiveWindowUpdate(c.Window)
 		return c
 	}
@@ -240,7 +240,7 @@ func (tr *Tracker) RefreshActiveClient() *store.Client {
 	return tr.ActiveClient()
 }
 
-func (tr *Tracker) clientForWindow(window store.XWindow) *store.Client {
+func (tr *Tracker) ClientForWindow(window store.XWindow) *store.Client {
 	if tr == nil {
 		return nil
 	}

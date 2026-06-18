@@ -103,3 +103,19 @@ func TestShouldWarpPointerRequiresConfigAndPointerInsideClient(t *testing.T) {
 		t.Fatal("pointer warp enabled while pointer is outside client")
 	}
 }
+
+func TestHoverFocusYieldsToUnmanagedWindow(t *testing.T) {
+	managed := directionTestClient(1, common.Geometry{})
+	tracker := &desktop.Tracker{
+		Clients: map[xproto.Window]*store.Client{
+			managed.Window.Id: managed,
+		},
+	}
+
+	if !hoverFocusAllowed(tracker, *managed.Window) {
+		t.Fatal("hover focus rejected managed active window")
+	}
+	if hoverFocusAllowed(tracker, store.XWindow{Id: 2}) {
+		t.Fatal("hover focus accepted unmanaged active window")
+	}
+}

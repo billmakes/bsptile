@@ -18,7 +18,7 @@ func TestClientForWindowUsesRequestedWindowInsteadOfStaleActiveCache(t *testing.
 		},
 	}
 
-	if client := tracker.clientForWindow(*focused.Window); client != focused {
+	if client := tracker.ClientForWindow(*focused.Window); client != focused {
 		t.Fatalf("resolved client = %v, want focused client", client)
 	}
 }

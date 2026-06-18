@@ -93,6 +93,14 @@ func updateFocus(tr *desktop.Tracker) {
 		return
 	}
 
+	// Do not steal focus from dialogs and other windows intentionally excluded
+	// from tiling. The user can click or explicitly focus a tiled window to
+	// return keyboard and hover focus to bsptile.
+	if focused, ok := store.InputFocusGet(store.X); ok && !hoverFocusAllowed(tr, focused) {
+		cancelHoverFocus()
+		return
+	}
+
 	// Ignore untracked clients
 	hovered := tr.ClientAt(ws, store.Pointer.Position)
 	if hovered == nil {
@@ -131,6 +139,10 @@ func updateFocus(tr *desktop.Tracker) {
 		}
 	})
 	hoverLock.Unlock()
+}
+
+func hoverFocusAllowed(tr *desktop.Tracker, focused store.XWindow) bool {
+	return tr != nil && tr.ClientForWindow(focused) != nil
 }
 
 func cancelHoverFocus() {
