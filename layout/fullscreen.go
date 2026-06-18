@@ -43,6 +43,7 @@ func (l *FullscreenLayout) Apply() {
 			c.Fullscreen()
 			c.Update()
 		} else {
+			c.UnLimit()
 			c.UnFullscreen()
 		}
 	}

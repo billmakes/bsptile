@@ -588,6 +588,13 @@ func (tr *Tracker) onStateUpdate(state string, desktop uint, screen uint) {
 	}
 
 	if focusChanged {
+		// Maximized and fullscreen layouts follow the active window. Reapply
+		// them after the window manager publishes the new active window.
+		ws := tr.ClientWorkspace(tr.ActiveClient())
+		if ws != nil && ws.ActiveWindowLayout() {
+			tr.Tile(ws)
+		}
+
 		// Communicate windows change
 		tr.Channels.Event <- "windows_change"
 	}

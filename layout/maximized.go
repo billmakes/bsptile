@@ -38,6 +38,13 @@ func (l *MaximizedLayout) Apply() {
 
 	log.Info("Tile active window with ", l.Name, " layout [workspace-", l.Location.Desktop, "-", l.Location.Screen, "]")
 
+	for _, c := range l.Clients(store.Ordered) {
+		if c != active {
+			c.UnLimit()
+			c.UnFullscreen()
+		}
+	}
+
 	minw := int(math.Round(float64(dw - 2*gap)))
 	minh := int(math.Round(float64(dh - 2*gap)))
 	active.Limit(minw, minh)

@@ -80,6 +80,13 @@ func (ws *Workspace) ActiveLayout() Layout {
 	return ws.Layouts[ws.Layout]
 }
 
+func (ws *Workspace) ActiveWindowLayout() bool {
+	if ws == nil {
+		return false
+	}
+	return common.IsInList(ws.ActiveLayout().GetName(), []string{"maximized", "fullscreen"})
+}
+
 func (ws *Workspace) SetLayout(layout uint) {
 	if int(layout) >= len(ws.Layouts) {
 		layout = 0
@@ -117,7 +124,7 @@ func (ws *Workspace) VisibleClients() []*store.Client {
 
 	// Obtain visible clients
 	clients := mg.Clients(store.Stacked)
-	if common.IsInList(al.GetName(), []string{"maximized", "fullscreen"}) {
+	if ws.ActiveWindowLayout() {
 		active := mg.ActiveClient()
 		if active != nil {
 			return []*store.Client{active}
