@@ -10,6 +10,7 @@ import (
 	"github.com/billmakes/bsptile/v2/common"
 	"github.com/billmakes/bsptile/v2/desktop"
 	"github.com/billmakes/bsptile/v2/store"
+	"github.com/billmakes/bsptile/v2/ui"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -40,6 +41,7 @@ func SetKeyMode(mode string, tr *desktop.Tracker) bool {
 	}
 
 	setKeyMode(mode, tr)
+	ui.ShowMode(tr.ActiveWorkspace(), mode)
 	log.Info("Key mode ", mode)
 	return true
 }

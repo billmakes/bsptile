@@ -70,6 +70,24 @@ func ShowLayout(ws *desktop.Workspace) {
 	})
 }
 
+func ShowMode(ws *desktop.Workspace, mode string) {
+	location := store.Location{Desktop: store.Workplace.CurrentDesktop}
+	if ws == nil || ws.Location.Desktop != location.Desktop || common.Config.TilingGui <= 0 {
+		return
+	}
+
+	const width = 240
+	const height = 52
+
+	bg := bgra("gui_background")
+	cv := xgraphics.New(store.X, image.Rect(0, 0, width, height))
+	cv.For(func(x int, y int) xgraphics.BGRA { return bg })
+
+	size := fontSize + 2
+	drawText(cv, "mode: "+mode, bgra("gui_text"), width/2, (height+size)/2, size)
+	showGraphics(cv, ws, time.Duration(common.Config.TilingGui))
+}
+
 func drawClients(cv *xgraphics.Image, ws *desktop.Workspace, layout string) {
 	clients := ws.VisibleClients()
 
