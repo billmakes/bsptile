@@ -104,7 +104,7 @@ func TestShouldWarpPointerRequiresConfigAndPointerInsideClient(t *testing.T) {
 	}
 }
 
-func TestHoverFocusYieldsToUnmanagedWindow(t *testing.T) {
+func TestHoverFocusUsesOnlyManagedTopmostWindow(t *testing.T) {
 	managed := directionTestClient(1, common.Geometry{})
 	tracker := &desktop.Tracker{
 		Clients: map[xproto.Window]*store.Client{
@@ -112,10 +112,10 @@ func TestHoverFocusYieldsToUnmanagedWindow(t *testing.T) {
 		},
 	}
 
-	if !hoverFocusAllowed(tracker, *managed.Window) {
-		t.Fatal("hover focus rejected managed active window")
+	if client := hoverClient(tracker, *managed.Window); client != managed {
+		t.Fatal("hover focus rejected managed topmost window")
 	}
-	if hoverFocusAllowed(tracker, store.XWindow{Id: 2}) {
-		t.Fatal("hover focus accepted unmanaged active window")
+	if client := hoverClient(tracker, store.XWindow{Id: 2}); client != nil {
+		t.Fatal("hover focus accepted unmanaged topmost window")
 	}
 }

@@ -83,8 +83,7 @@ func updateCorner(tr *desktop.Tracker) {
 }
 
 func updateFocus(tr *desktop.Tracker) {
-	ws := tr.ActiveWorkspace()
-	if ws == nil || pointer == nil {
+	if tr == nil || pointer == nil {
 		return
 	}
 
@@ -93,17 +92,22 @@ func updateFocus(tr *desktop.Tracker) {
 		return
 	}
 
-	// Do not steal focus from dialogs and other windows intentionally excluded
-	// from tiling. The user can click or explicitly focus a tiled window to
-	// return keyboard and hover focus to bsptile.
-	if focused, ok := store.InputFocusGet(store.X); ok && !hoverFocusAllowed(tr, focused) {
+	top, ok := store.WindowAt(store.X, store.Pointer.Position, store.Workplace.CurrentDesktop)
+	if !ok {
 		cancelHoverFocus()
 		return
 	}
 
-	// Ignore untracked clients
-	hovered := tr.ClientAt(ws, store.Pointer.Position)
+	// Use the actual topmost window under the pointer. This prevents a tiled
+	// client's geometry underneath an unmanaged dialog from stealing focus.
+	hovered := hoverClient(tr, top)
 	if hovered == nil {
+		cancelHoverFocus()
+		return
+	}
+
+	ws := tr.ClientWorkspace(hovered)
+	if ws == nil {
 		return
 	}
 	log.Info("Hovered window updated [", hovered.Latest.Class, "]")
@@ -127,8 +131,9 @@ func updateFocus(tr *desktop.Tracker) {
 		hover = nil
 		hoverLock.Unlock()
 
-		// Hovered client window has changed in the meantime
-		if hovered != tr.ClientAt(ws, store.Pointer.Position) {
+		// Hovered top-level window has changed in the meantime.
+		current, ok := store.WindowAt(store.X, store.Pointer.Position, store.Workplace.CurrentDesktop)
+		if !ok || current.Id != hovered.Window.Id {
 			return
 		}
 
@@ -141,8 +146,11 @@ func updateFocus(tr *desktop.Tracker) {
 	hoverLock.Unlock()
 }
 
-func hoverFocusAllowed(tr *desktop.Tracker, focused store.XWindow) bool {
-	return tr != nil && tr.ClientForWindow(focused) != nil
+func hoverClient(tr *desktop.Tracker, window store.XWindow) *store.Client {
+	if tr == nil {
+		return nil
+	}
+	return tr.ClientForWindow(window)
 }
 
 func cancelHoverFocus() {

@@ -52,6 +52,9 @@ window_focus_delay = 0
 # Move the pointer with keyboard focus, swap, and screen-move actions.
 window_pointer_warp = false
 
+# Keep dialogs and configured unmanaged/floating windows above tiled windows.
+window_floating_above = true
+
 # Initial rendering of window decorations (true | false).
 window_decoration = true
 

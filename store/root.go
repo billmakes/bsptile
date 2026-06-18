@@ -292,6 +292,32 @@ func ClientListStackingGet(X *xgbutil.XUtil) []XWindow {
 	return windows
 }
 
+func WindowAt(X *xgbutil.XUtil, p common.Point, desktop uint) (XWindow, bool) {
+	if X == nil || Windows == nil {
+		return XWindow{}, false
+	}
+
+	// EWMH stacking order is bottom-to-top, so inspect it in reverse.
+	for i := len(Windows.Stacked) - 1; i >= 0; i-- {
+		window := Windows.Stacked[i]
+		geom, err := window.Instance.DecorGeometry()
+		if err != nil || !common.IsInsideRect(p, *common.CreateGeometry(geom)) {
+			continue
+		}
+
+		info := GetInfo(window.Id)
+		if info.Location.Desktop != desktop && !IsSticky(info) {
+			continue
+		}
+		if IsMinimized(info) {
+			continue
+		}
+		return window, true
+	}
+
+	return XWindow{}, false
+}
+
 func DisplaysGet(X *xgbutil.XUtil) XDisplays {
 	var name string
 

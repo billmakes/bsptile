@@ -19,26 +19,27 @@ var (
 )
 
 type Configuration struct {
-	TilingEnabled     bool                   `toml:"tiling_enabled"`      // Tile windows on startup
-	TilingGui         int                    `toml:"tiling_gui"`          // Time duration of gui
-	TilingIcon        [][]string             `toml:"tiling_icon"`         // Menu entries of systray
-	WindowIgnore      [][]string             `toml:"window_ignore"`       // Regex to ignore windows
-	WindowGapSize     int                    `toml:"window_gap_size"`     // Gap size between windows
-	WindowFocusDelay  int                    `toml:"window_focus_delay"`  // Window focus delay when hovered
-	WindowPointerWarp bool                   `toml:"window_pointer_warp"` // Move pointer with keyboard window actions
-	WindowDecoration  bool                   `toml:"window_decoration"`   // Show window decorations
-	ProportionStep    float64                `toml:"proportion_step"`     // BSP split ratio step
-	ProportionMin     float64                `toml:"proportion_min"`      // BSP split ratio minimum
-	EdgeMargin        []int                  `toml:"edge_margin"`         // Margin values of tiling area
-	EdgeMarginPrimary []int                  `toml:"edge_margin_primary"` // Margin values of primary tiling area
-	EdgeCornerSize    int                    `toml:"edge_corner_size"`    // Size of square defining edge corners
-	EdgeCenterSize    int                    `toml:"edge_center_size"`    // Length of rectangle defining edge centers
-	DropTargetWidth   int                    `toml:"drop_target_width"`   // Outline width (px) of drop-target indicator
-	Colors            map[string][]int       `toml:"colors"`              // List of color values for gui elements
-	Keys              map[string]KeyBindings `toml:"keys"`                // Event bindings for keyboard shortcuts
-	Modes             map[string]Mode        `toml:"modes"`               // Alternate keyboard shortcut layers
-	Corners           map[string]string      `toml:"corners"`             // Event bindings for hot-corner actions
-	Systray           map[string]string      `toml:"systray"`             // Event bindings for systray icon
+	TilingEnabled       bool                   `toml:"tiling_enabled"`        // Tile windows on startup
+	TilingGui           int                    `toml:"tiling_gui"`            // Time duration of gui
+	TilingIcon          [][]string             `toml:"tiling_icon"`           // Menu entries of systray
+	WindowIgnore        [][]string             `toml:"window_ignore"`         // Regex to ignore windows
+	WindowGapSize       int                    `toml:"window_gap_size"`       // Gap size between windows
+	WindowFocusDelay    int                    `toml:"window_focus_delay"`    // Window focus delay when hovered
+	WindowPointerWarp   bool                   `toml:"window_pointer_warp"`   // Move pointer with keyboard window actions
+	WindowFloatingAbove bool                   `toml:"window_floating_above"` // Keep eligible unmanaged windows above tiled windows
+	WindowDecoration    bool                   `toml:"window_decoration"`     // Show window decorations
+	ProportionStep      float64                `toml:"proportion_step"`       // BSP split ratio step
+	ProportionMin       float64                `toml:"proportion_min"`        // BSP split ratio minimum
+	EdgeMargin          []int                  `toml:"edge_margin"`           // Margin values of tiling area
+	EdgeMarginPrimary   []int                  `toml:"edge_margin_primary"`   // Margin values of primary tiling area
+	EdgeCornerSize      int                    `toml:"edge_corner_size"`      // Size of square defining edge corners
+	EdgeCenterSize      int                    `toml:"edge_center_size"`      // Length of rectangle defining edge centers
+	DropTargetWidth     int                    `toml:"drop_target_width"`     // Outline width (px) of drop-target indicator
+	Colors              map[string][]int       `toml:"colors"`                // List of color values for gui elements
+	Keys                map[string]KeyBindings `toml:"keys"`                  // Event bindings for keyboard shortcuts
+	Modes               map[string]Mode        `toml:"modes"`                 // Alternate keyboard shortcut layers
+	Corners             map[string]string      `toml:"corners"`               // Event bindings for hot-corner actions
+	Systray             map[string]string      `toml:"systray"`               // Event bindings for systray icon
 }
 
 type KeyBindings []string

@@ -99,7 +99,11 @@ func (tr *Tracker) Update() {
 	// Map trackable windows
 	trackable := make(map[xproto.Window]bool)
 	for _, w := range store.Windows.Stacked {
-		trackable[w.Id] = tr.isTrackable(w.Id)
+		info := store.GetInfo(w.Id)
+		trackable[w.Id] = !store.IsSpecial(info) && !store.IsIgnored(info)
+		if common.Config.WindowFloatingAbove && !trackable[w.Id] && store.IsFloating(info) {
+			store.SetAbove(w.Id)
+		}
 	}
 
 	// Remove untrackable windows

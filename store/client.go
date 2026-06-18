@@ -426,6 +426,29 @@ func IsIgnored(info *Info) bool {
 	return false
 }
 
+func IsFloating(info *Info) bool {
+	if info == nil || len(info.Class) == 0 || info.Class == common.Build.Name {
+		return false
+	}
+	if IsIgnored(info) {
+		return true
+	}
+
+	floatingTypes := []string{
+		"_NET_WM_WINDOW_TYPE_DIALOG",
+		"_NET_WM_WINDOW_TYPE_UTILITY",
+		"_NET_WM_WINDOW_TYPE_TOOLBAR",
+		"_NET_WM_WINDOW_TYPE_SPLASH",
+	}
+	for _, typ := range info.Types {
+		if common.IsInList(typ, floatingTypes) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func IsFullscreen(info *Info) bool {
 	return common.IsInList("_NET_WM_STATE_FULLSCREEN", info.States)
 }
@@ -440,6 +463,18 @@ func IsMinimized(info *Info) bool {
 
 func IsAbove(info *Info) bool {
 	return common.IsInList("_NET_WM_STATE_ABOVE", info.States)
+}
+
+func SetAbove(window xproto.Window) bool {
+	info := GetInfo(window)
+	if IsAbove(info) {
+		return false
+	}
+	if err := ewmh.WmStateReq(X, window, ewmh.StateAdd, "_NET_WM_STATE_ABOVE"); err != nil {
+		log.Warn("Error setting window above [", info.Class, "]: ", err)
+		return false
+	}
+	return true
 }
 
 func IsSticky(info *Info) bool {

@@ -69,6 +69,9 @@ focus changes while keeping hover focus responsive; `0` disables it.
 Keyboard actions do not move the pointer by default. Set
 `window_pointer_warp = true` to move it with directional focus, directional
 window swaps, and screen moves.
+Dialogs and eligible unmanaged/floating windows are kept above tiled windows by
+default. Set `window_floating_above = false` to leave their stacking entirely
+to the window manager.
 
 ### Shortcuts
 Default keyboard shortcuts:

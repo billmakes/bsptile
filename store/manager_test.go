@@ -15,6 +15,54 @@ func testClient(id xproto.Window) *Client {
 	}
 }
 
+func TestFloatingClassification(t *testing.T) {
+	previousIgnore := common.Config.WindowIgnore
+	common.Config.WindowIgnore = [][]string{{"ignored.*", ""}}
+	t.Cleanup(func() {
+		common.Config.WindowIgnore = previousIgnore
+	})
+
+	tests := []struct {
+		name string
+		info *Info
+		want bool
+	}{
+		{
+			name: "dialog",
+			info: &Info{Class: "Xfce4-settings-manager", Types: []string{"_NET_WM_WINDOW_TYPE_DIALOG"}},
+			want: true,
+		},
+		{
+			name: "configured ignored normal window",
+			info: &Info{Class: "ignored-app", Types: []string{"_NET_WM_WINDOW_TYPE_NORMAL"}},
+			want: true,
+		},
+		{
+			name: "managed normal window",
+			info: &Info{Class: "terminal", Types: []string{"_NET_WM_WINDOW_TYPE_NORMAL"}},
+			want: false,
+		},
+		{
+			name: "dock",
+			info: &Info{Class: "panel", Types: []string{"_NET_WM_WINDOW_TYPE_DOCK"}},
+			want: false,
+		},
+		{
+			name: "notification",
+			info: &Info{Class: "notify", Types: []string{"_NET_WM_WINDOW_TYPE_NOTIFICATION"}},
+			want: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := IsFloating(test.info); got != test.want {
+				t.Fatalf("IsFloating() = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
 func TestBSPInsertSplitsLongestSide(t *testing.T) {
 	mg := CreateBSPManager(Location{})
 	first := testClient(1)
