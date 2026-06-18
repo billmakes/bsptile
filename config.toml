@@ -26,6 +26,12 @@ tiling_icon = [
     ["exit", "Exit"],
 ]
 
+#################################### Input #####################################
+
+# Register bsptile's built-in global keyboard shortcuts. Set false when an
+# external hotkey daemon such as sxhkd invokes actions through bsptilectl.
+keybindings_enabled = true
+
 #################################### Window ####################################
 
 # Regex RE2 syntax to ignore windows (WM_CLASS string can be found by running `xprop WM_CLASS`).

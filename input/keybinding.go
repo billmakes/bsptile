@@ -21,8 +21,7 @@ var activeKeyMode = defaultKeyMode
 
 func BindKeys(tr *desktop.Tracker) {
 	keybind.Initialize(store.X)
-	activeKeyMode = defaultKeyMode
-	bindDefaultKeys(tr)
+	ReloadKeys(tr)
 
 	// Bind action channel
 	go action(tr.Channels.Action, tr)
@@ -33,6 +32,10 @@ func ReloadKeys(tr *desktop.Tracker) {
 }
 
 func SetKeyMode(mode string, tr *desktop.Tracker) bool {
+	if !common.Config.KeybindingsEnabled {
+		log.Warn("Built-in keybindings are disabled")
+		return false
+	}
 	if mode != defaultKeyMode {
 		if _, ok := common.Config.Modes[mode]; !ok {
 			log.Warn("Unknown key mode ", mode)
@@ -49,6 +52,10 @@ func SetKeyMode(mode string, tr *desktop.Tracker) bool {
 func setKeyMode(mode string, tr *desktop.Tracker) {
 	keybind.Detach(store.X, store.X.RootWin())
 	activeKeyMode = mode
+	if !common.Config.KeybindingsEnabled {
+		log.Info("Built-in keybindings disabled")
+		return
+	}
 	if mode == defaultKeyMode {
 		bindDefaultKeys(tr)
 		return

@@ -111,6 +111,34 @@ func TestReadConfigReplacesConfigOnlyAfterSuccessfulDecode(t *testing.T) {
 	}
 }
 
+func TestReadConfigDefaultsKeybindingsEnabledForExistingConfigs(t *testing.T) {
+	path := t.TempDir() + "/config.toml"
+	previous := Config
+	t.Cleanup(func() {
+		Config = previous
+	})
+
+	if err := os.WriteFile(path, []byte("[keys]\ntoggle = \"Control-T\"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if !readConfig(path, false) {
+		t.Fatal("expected config to load")
+	}
+	if !Config.KeybindingsEnabled {
+		t.Fatal("missing keybindings_enabled should preserve built-in shortcuts")
+	}
+
+	if err := os.WriteFile(path, []byte("keybindings_enabled = false\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if !readConfig(path, false) {
+		t.Fatal("expected config to load")
+	}
+	if Config.KeybindingsEnabled {
+		t.Fatal("explicit keybindings_enabled = false was ignored")
+	}
+}
+
 func TestValidateConfigRequiresModeDefault(t *testing.T) {
 	config := Configuration{
 		Modes: map[string]Mode{

@@ -69,6 +69,8 @@ focus changes while keeping hover focus responsive; `0` disables it.
 Keyboard actions do not move the pointer by default. Set
 `window_pointer_warp = true` to move it with directional focus, directional
 window swaps, and screen moves.
+Set `keybindings_enabled = false` to release bsptile's global keyboard grabs
+when an external hotkey daemon such as sxhkd invokes actions through IPC.
 Dialogs and eligible unmanaged/floating windows are kept above tiled windows by
 default. Set `window_floating_above = false` to leave their stacking entirely
 to the window manager.
@@ -132,6 +134,26 @@ layout_bsp = ["Button12", "Control-Button12"]
 
 Plain button bindings are passive global grabs. Do not bind buttons that must
 continue reaching applications or window-manager mouse actions.
+
+### External hotkey daemons
+
+Built-in keyboard shortcuts can be disabled without disabling the action
+system:
+
+```toml
+keybindings_enabled = false
+```
+
+An sxhkd binding can then invoke an action through the control socket:
+
+```text
+super + f
+    bsptilectl action layout_fullscreen
+```
+
+Use the same action names documented in `[keys]`. Mouse bindings, hot corners,
+the systray, IPC, and D-Bus remain active when built-in keybindings are
+disabled.
 
 Hot corner events (configured under `[corners]`):
 | Corner                             | Description                          |

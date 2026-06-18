@@ -22,6 +22,7 @@ type Configuration struct {
 	TilingEnabled       bool                   `toml:"tiling_enabled"`        // Tile windows on startup
 	TilingGui           int                    `toml:"tiling_gui"`            // Time duration of gui
 	TilingIcon          [][]string             `toml:"tiling_icon"`           // Menu entries of systray
+	KeybindingsEnabled  bool                   `toml:"keybindings_enabled"`   // Register built-in global keyboard shortcuts
 	WindowIgnore        [][]string             `toml:"window_ignore"`         // Regex to ignore windows
 	WindowGapSize       int                    `toml:"window_gap_size"`       // Gap size between windows
 	WindowFocusDelay    int                    `toml:"window_focus_delay"`    // Window focus delay when hovered
@@ -113,7 +114,7 @@ func readConfig(configFilePath string, initial bool) bool {
 
 	// Decode into a temporary value so an invalid file cannot partially update
 	// the running configuration.
-	var config Configuration
+	config := Configuration{KeybindingsEnabled: true}
 	_, err := toml.DecodeFile(configFilePath, &config)
 	if err != nil {
 		if initial {

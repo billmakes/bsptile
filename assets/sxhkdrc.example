@@ -1,0 +1,144 @@
+#
+# bsptile via sxhkd
+#
+# sxhkd captures the key, bsptilectl talks to the daemon over its Unix socket.
+# To use this file:
+#
+#   1. Make sure bsptile and bsptilectl are on $PATH (or symlinked to ~/.local/bin).
+#   2. Clear the [keys] entries in ~/.config/bsptile/config.toml that you want
+#      sxhkd to own — otherwise both will grab the same chord and only one wins.
+#   3. Reload: bsptilectl reload  (and pkill -USR1 -x sxhkd)
+#
+# Reload sxhkd after editing this file:
+#   super + Escape  ->  pkill -USR1 -x sxhkd
+#
+
+#
+# tiling state
+#
+
+# toggle tiling on the current screen
+super + o
+    bsptilectl action toggle
+
+# enable / disable tiling explicitly
+super + Home
+    bsptilectl action enable
+super + End
+    bsptilectl action disable
+
+# toggle window decorations
+ctrl + shift + d
+    bsptilectl action decoration
+
+# disable tiling and restore window positions
+ctrl + shift + r
+    bsptilectl action restore
+
+# reset BSP split ratios to 0.5
+ctrl + shift + BackSpace
+    bsptilectl action reset
+
+# balance the BSP tree so every window has equal area
+ctrl + shift + b
+    bsptilectl action balance
+
+# reload bsptile config
+ctrl + shift + c
+    bsptilectl reload
+
+#
+# layouts
+#
+
+# rotate the BSP tree clockwise by 90 degrees
+super + r
+    bsptilectl action tree_rotate
+
+# switch to BSP / maximized / fullscreen layouts
+super + e
+    bsptilectl action layout_bsp
+super + m
+    bsptilectl action layout_maximized
+super + f
+    bsptilectl action layout_fullscreen
+
+#
+# focus
+#
+
+# directional focus (i3-style hjkl + arrow keys)
+super + {h,j,k,l}
+    bsptilectl action window_{left,down,up,right}
+super + {Left,Down,Up,Right}
+    bsptilectl action window_{left,down,up,right}
+
+# cycle focus through windows on the current workspace
+super + Tab
+    bsptilectl action window_next
+super + shift + Tab
+    bsptilectl action window_previous
+
+#
+# window movement
+#
+
+# swap the active window with the nearest in each direction
+super + shift + {h,j,k,l}
+    bsptilectl action move_window_{left,down,up,right}
+super + shift + {Left,Down,Up,Right}
+    bsptilectl action move_window_{left,down,up,right}
+
+# move the active window to the next/previous BSP position
+super + ctrl + j
+    bsptilectl action position_next
+super + ctrl + k
+    bsptilectl action position_previous
+
+# move the active window to the next/previous screen
+super + ctrl + l
+    bsptilectl action screen_next
+super + ctrl + shift + h
+    bsptilectl action screen_previous
+
+#
+# proportion
+#
+
+# grow / shrink the focused BSP split
+super + plus
+    bsptilectl action proportion_increase
+super + minus
+    bsptilectl action proportion_decrease
+
+# resize mode as an sxhkd chord:
+#   super + shift + r, then h/j/k/l (or arrow keys) to move the nearest split.
+# This is the sxhkd-native version of bsptile's internal `mode_resize` — it
+# avoids the mode state in the daemon, which would be invisible to sxhkd anyway.
+super + shift + r ; {h,j,k,l}
+    bsptilectl action proportion_{left,down,up,right}
+super + shift + r ; {Left,Down,Up,Right}
+    bsptilectl action proportion_{left,down,up,right}
+
+#
+# broadcast modifiers
+#
+# bsptile's keyboard system uses mod_screens / mod_workspaces to "fan an action
+# out to every screen or workspace". With sxhkd you pass the same intent via
+# --mod. Add variants like this where you want them:
+#
+#   super + alt + o
+#       bsptilectl action toggle --mod screens
+#
+#   super + ctrl + alt + o
+#       bsptilectl action toggle --mod workspaces
+
+#
+# lifecycle
+#
+
+# restart / exit bsptile
+super + ctrl + shift + r
+    bsptilectl wm restart
+super + ctrl + shift + q
+    bsptilectl wm exit
