@@ -25,6 +25,7 @@ type Configuration struct {
 	WindowIgnore      [][]string             `toml:"window_ignore"`       // Regex to ignore windows
 	WindowGapSize     int                    `toml:"window_gap_size"`     // Gap size between windows
 	WindowFocusDelay  int                    `toml:"window_focus_delay"`  // Window focus delay when hovered
+	WindowPointerWarp bool                   `toml:"window_pointer_warp"` // Move pointer with keyboard window actions
 	WindowDecoration  bool                   `toml:"window_decoration"`   // Show window decorations
 	ProportionStep    float64                `toml:"proportion_step"`     // BSP split ratio step
 	ProportionMin     float64                `toml:"proportion_min"`      // BSP split ratio minimum

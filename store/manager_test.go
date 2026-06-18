@@ -208,3 +208,84 @@ func TestBSPDirectionProportionUsesNearestMatchingAncestor(t *testing.T) {
 		t.Fatalf("down resize ratio = %v, want 0.5", right.Ratio)
 	}
 }
+
+func TestDirectionClientPrioritizesDistanceInRequestedDirection(t *testing.T) {
+	active := testClient(1)
+	nearLeft := testClient(2)
+	farAlignedLeft := testClient(3)
+	active.Latest.Dimensions.Geometry = common.Geometry{X: 2000, Y: 400, Width: 400, Height: 400}
+	nearLeft.Latest.Dimensions.Geometry = common.Geometry{X: 1400, Y: 200, Width: 400, Height: 400}
+	farAlignedLeft.Latest.Dimensions.Geometry = common.Geometry{X: 0, Y: 400, Width: 400, Height: 400}
+
+	activeNode := &Node{Client: active}
+	nearNode := &Node{Client: nearLeft}
+	farNode := &Node{Client: farAlignedLeft}
+	left := &Node{First: farNode, Second: nearNode}
+	root := &Node{First: left, Second: activeNode}
+	farNode.Parent = left
+	nearNode.Parent = left
+	left.Parent = root
+	activeNode.Parent = root
+
+	mg := &Manager{Root: root}
+	Windows = &XWindows{Active: *active.Window}
+
+	if target := mg.DirectionClient(common.Left); target != nearLeft {
+		t.Fatalf("left target = %v, want nearest window", target)
+	}
+}
+
+func TestDirectionClientPrefersPerpendicularOverlap(t *testing.T) {
+	active := testClient(1)
+	directAbove := testClient(2)
+	closerDiagonal := testClient(3)
+	active.Latest.Dimensions.Geometry = common.Geometry{X: 1000, Y: 500, Width: 400, Height: 400}
+	directAbove.Latest.Dimensions.Geometry = common.Geometry{X: 1000, Y: 0, Width: 400, Height: 400}
+	closerDiagonal.Latest.Dimensions.Geometry = common.Geometry{X: 500, Y: 350, Width: 400, Height: 100}
+
+	activeNode := &Node{Client: active}
+	directNode := &Node{Client: directAbove}
+	diagonalNode := &Node{Client: closerDiagonal}
+	above := &Node{First: directNode, Second: diagonalNode}
+	root := &Node{First: above, Second: activeNode}
+	directNode.Parent = above
+	diagonalNode.Parent = above
+	above.Parent = root
+	activeNode.Parent = root
+
+	mg := &Manager{Root: root}
+	Windows = &XWindows{Active: *active.Window}
+
+	if target := mg.DirectionClient(common.Up); target != directAbove {
+		t.Fatalf("up target = %v, want directly overlapping window", target)
+	}
+}
+
+func TestDirectionClientUsesSynchronousLeafBoundsAfterSwap(t *testing.T) {
+	left := &Node{
+		Client: testClient(1),
+		Bounds: common.Geometry{X: 0, Width: 500, Height: 500},
+	}
+	right := &Node{
+		Client: testClient(2),
+		Bounds: common.Geometry{X: 500, Width: 500, Height: 500},
+	}
+	root := &Node{First: left, Second: right}
+	left.Parent = root
+	right.Parent = root
+	mg := &Manager{Root: root}
+	Windows = &XWindows{Active: *left.Client.Window}
+
+	active := left.Client
+	target := right.Client
+	mg.SwapClient(active, target)
+
+	// Client geometry is intentionally stale. Tree bounds must still place the
+	// active client in the right leaf after the synchronous swap.
+	active.Latest.Dimensions.Geometry = common.Geometry{X: 0, Width: 500, Height: 500}
+	target.Latest.Dimensions.Geometry = common.Geometry{X: 500, Width: 500, Height: 500}
+
+	if selected := mg.DirectionClient(common.Left); selected != target {
+		t.Fatalf("left target = %v, want client in left BSP leaf", selected)
+	}
+}

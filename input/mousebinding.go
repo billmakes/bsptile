@@ -1,6 +1,7 @@
 package input
 
 import (
+	"sync"
 	"time"
 
 	"github.com/billmakes/bsptile/v2/common"
@@ -15,6 +16,8 @@ var (
 	workspace *desktop.Workspace // Stores previous workspace (for comparison only)
 	pointer   *store.XPointer    // Stores previous pointer (for comparison only)
 	hover     *time.Timer        // Timer to delay hover events
+	hoverLock sync.Mutex         // Protects hover timer state
+	hoverID   uint64             // Invalidates stale hover callbacks
 )
 
 func BindMouse(tr *desktop.Tracker) {
@@ -81,7 +84,7 @@ func updateCorner(tr *desktop.Tracker) {
 
 func updateFocus(tr *desktop.Tracker) {
 	ws := tr.ActiveWorkspace()
-	if ws == nil || pointer == nil || hover != nil {
+	if ws == nil || pointer == nil {
 		return
 	}
 
@@ -91,19 +94,30 @@ func updateFocus(tr *desktop.Tracker) {
 	}
 
 	// Ignore untracked clients
-	active := tr.ActiveClient()
 	hovered := tr.ClientAt(ws, store.Pointer.Position)
-	if active == nil || hovered == nil {
+	if hovered == nil {
 		return
 	}
 	log.Info("Hovered window updated [", hovered.Latest.Class, "]")
 
 	// Delay hover event by given duration
-	if common.Config.WindowFocusDelay == 0 {
+	if common.Config.WindowFocusDelay <= 0 {
 		return
 	}
+	hoverLock.Lock()
+	if hover != nil {
+		hover.Stop()
+	}
+	hoverID++
+	id := hoverID
 	hover = time.AfterFunc(time.Duration(common.Config.WindowFocusDelay)*time.Millisecond, func() {
+		hoverLock.Lock()
+		if id != hoverID {
+			hoverLock.Unlock()
+			return
+		}
 		hover = nil
+		hoverLock.Unlock()
 
 		// Hovered client window has changed in the meantime
 		if hovered != tr.ClientAt(ws, store.Pointer.Position) {
@@ -111,10 +125,23 @@ func updateFocus(tr *desktop.Tracker) {
 		}
 
 		// Focus hovered client window
+		active := tr.ActiveClient()
 		if hovered != active && ws.TilingEnabled() && !tr.Handlers.Active() {
 			store.ActiveWindowSet(store.X, hovered.Window)
 		}
 	})
+	hoverLock.Unlock()
+}
+
+func cancelHoverFocus() {
+	hoverLock.Lock()
+	defer hoverLock.Unlock()
+
+	hoverID++
+	if hover != nil {
+		hover.Stop()
+		hover = nil
+	}
 }
 
 func poll(t time.Duration, fun func()) {

@@ -152,6 +152,68 @@ const (
 	Right
 )
 
+type DirectionScore struct {
+	Beam      bool
+	Primary   int
+	Secondary int
+}
+
+func ScoreDirection(source Geometry, target Geometry, direction Direction) (DirectionScore, bool) {
+	sourceCenter := source.Center()
+	targetCenter := target.Center()
+	dx, dy := targetCenter.X-sourceCenter.X, targetCenter.Y-sourceCenter.Y
+	score := DirectionScore{}
+
+	switch direction {
+	case Up:
+		if dy >= 0 {
+			return score, false
+		}
+		score.Beam = intervalsOverlap(source.X, source.X+source.Width, target.X, target.X+target.Width)
+		score.Primary = MaxInt(source.Y-(target.Y+target.Height), 0)
+		score.Secondary = AbsInt(dx)
+	case Down:
+		if dy <= 0 {
+			return score, false
+		}
+		score.Beam = intervalsOverlap(source.X, source.X+source.Width, target.X, target.X+target.Width)
+		score.Primary = MaxInt(target.Y-(source.Y+source.Height), 0)
+		score.Secondary = AbsInt(dx)
+	case Left:
+		if dx >= 0 {
+			return score, false
+		}
+		score.Beam = intervalsOverlap(source.Y, source.Y+source.Height, target.Y, target.Y+target.Height)
+		score.Primary = MaxInt(source.X-(target.X+target.Width), 0)
+		score.Secondary = AbsInt(dy)
+	case Right:
+		if dx <= 0 {
+			return score, false
+		}
+		score.Beam = intervalsOverlap(source.Y, source.Y+source.Height, target.Y, target.Y+target.Height)
+		score.Primary = MaxInt(target.X-(source.X+source.Width), 0)
+		score.Secondary = AbsInt(dy)
+	default:
+		return score, false
+	}
+
+	return score, true
+}
+
+func BetterDirectionScore(candidate DirectionScore, current DirectionScore) bool {
+	if candidate.Beam != current.Beam {
+		return candidate.Beam
+	}
+	if candidate.Primary != current.Primary {
+		return candidate.Primary < current.Primary
+	}
+	return candidate.Secondary < current.Secondary
+}
+
+func intervalsOverlap(aStart int, aEnd int, bStart int, bEnd int) bool {
+	return aStart < bEnd && bStart < aEnd
+}
+
 func AbsInt(n int) int {
 	if n < 0 {
 		return -n

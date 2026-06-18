@@ -62,6 +62,14 @@ window adjusts the nearest matching split ratio.
 The configuration file is located at `~/.config/bsptile/config.toml` (or `XDG_CONFIG_HOME`) and is created with default values on first startup.
 See [config.toml](https://github.com/billmakes/bsptile/blob/main/config.toml) for all available options.
 
+bsptile can own focus-follows-mouse instead of the window manager. Disable the
+window manager's focus-follows-mouse setting, then set `window_focus_delay` to a
+positive delay in milliseconds. A value around `100`–`150` avoids accidental
+focus changes while keeping hover focus responsive; `0` disables it.
+Keyboard actions do not move the pointer by default. Set
+`window_pointer_warp = true` to move it with directional focus, directional
+window swaps, and screen moves.
+
 ### Shortcuts
 Default keyboard shortcuts:
 | Keys                                                    | Description                                     |

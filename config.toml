@@ -49,6 +49,9 @@ window_gap_size = 10
 # When hovered for this duration [ms] windows are focused (0 = disabled).
 window_focus_delay = 0
 
+# Move the pointer with keyboard focus, swap, and screen-move actions.
+window_pointer_warp = false
+
 # Initial rendering of window decorations (true | false).
 window_decoration = true
 

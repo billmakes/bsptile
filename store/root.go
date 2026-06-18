@@ -248,9 +248,25 @@ func ActiveWindowGet(X *xgbutil.XUtil) XWindow {
 	return *CreateXWindow(active)
 }
 
+func InputFocusGet(X *xgbutil.XUtil) (XWindow, bool) {
+	if X == nil {
+		return XWindow{}, false
+	}
+	reply, err := xproto.GetInputFocus(X.Conn()).Reply()
+	if err != nil || reply.Focus <= xproto.Window(1) {
+		return XWindow{}, false
+	}
+	return *CreateXWindow(reply.Focus), true
+}
+
 func ActiveWindowSet(X *xgbutil.XUtil, w *XWindow) {
-	ewmh.ActiveWindowSet(X, w.Id)
-	ewmh.ClientEvent(X, w.Id, "_NET_ACTIVE_WINDOW", int(2), int(0), int(0))
+	if X == nil || w == nil {
+		return
+	}
+	if err := ewmh.ActiveWindowReq(X, w.Id); err != nil {
+		log.Warn("Error requesting active window: ", err)
+		return
+	}
 	ActiveWindowUpdate(w)
 }
 

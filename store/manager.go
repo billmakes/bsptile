@@ -227,49 +227,32 @@ func (mg *Manager) DirectionClient(direction common.Direction) *Client {
 	if active == nil {
 		return nil
 	}
+	activeGeometry := mg.clientGeometry(active)
 
-	activeCenter := active.Latest.Dimensions.Geometry.Center()
 	var target *Client
-	minPrimary, minSecondary := 0, 0
+	var best common.DirectionScore
 
 	for _, c := range mg.Clients(Stacked) {
 		if c == active {
 			continue
 		}
-		center := c.Latest.Dimensions.Geometry.Center()
-		dx, dy := center.X-activeCenter.X, center.Y-activeCenter.Y
-		primary, secondary := 0, 0
-
-		switch direction {
-		case common.Up:
-			if dy >= 0 {
-				continue
-			}
-			primary, secondary = common.AbsInt(dx), common.AbsInt(dy)
-		case common.Down:
-			if dy <= 0 {
-				continue
-			}
-			primary, secondary = common.AbsInt(dx), common.AbsInt(dy)
-		case common.Left:
-			if dx >= 0 {
-				continue
-			}
-			primary, secondary = common.AbsInt(dy), common.AbsInt(dx)
-		case common.Right:
-			if dx <= 0 {
-				continue
-			}
-			primary, secondary = common.AbsInt(dy), common.AbsInt(dx)
+		score, ok := common.ScoreDirection(activeGeometry, mg.clientGeometry(c), direction)
+		if !ok {
+			continue
 		}
-
-		if target == nil || primary < minPrimary || (primary == minPrimary && secondary < minSecondary) {
+		if target == nil || common.BetterDirectionScore(score, best) {
 			target = c
-			minPrimary = primary
-			minSecondary = secondary
+			best = score
 		}
 	}
 	return target
+}
+
+func (mg *Manager) clientGeometry(c *Client) common.Geometry {
+	if node := mg.node(c); node != nil && node.Bounds.Width > 0 && node.Bounds.Height > 0 {
+		return node.Bounds
+	}
+	return c.Latest.Dimensions.Geometry
 }
 
 func (mg *Manager) Reset() {
@@ -320,8 +303,10 @@ func (mg *Manager) applyNode(node *Node, geom common.Geometry) {
 	if node.leaf() {
 		gap := common.Config.WindowGapSize
 		w, h := common.MaxInt(geom.Width-gap, 1), common.MaxInt(geom.Height-gap, 1)
+		x, y := geom.X+gap/2, geom.Y+gap/2
 		node.Client.Limit(w, h)
-		node.Client.MoveWindow(geom.X+gap/2, geom.Y+gap/2, w, h)
+		node.Client.MoveWindow(x, y, w, h)
+		node.Client.Latest.Dimensions.Geometry = common.Geometry{X: x, Y: y, Width: w, Height: h}
 		return
 	}
 

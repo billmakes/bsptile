@@ -36,6 +36,7 @@ func ExecuteAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) bo
 	if len(action) == 0 || tr == nil || ws == nil {
 		return false
 	}
+	cancelHoverFocus()
 
 	log.Info("Execute action ", action, " [", ws.Name, "]")
 
@@ -130,7 +131,7 @@ complete:
 }
 
 func ExecuteActions(action string, tr *desktop.Tracker, mod string) bool {
-	client := tr.ClientWorkspace(tr.ActiveClient())
+	client := tr.ClientWorkspace(tr.RefreshActiveClient())
 	active := tr.ActiveWorkspace()
 
 	// Use active client workspace as current
@@ -358,7 +359,7 @@ func DirectionWindow(tr *desktop.Tracker, ws *desktop.Workspace, d common.Direct
 	}
 
 	active := ws.ActiveLayout().ActiveClient()
-	movePointer := pointerInsideClient(active)
+	movePointer := shouldWarpPointer(active)
 
 	c := ws.ActiveLayout().DirectionClient(d)
 	if c == nil {
@@ -386,30 +387,21 @@ func DirectionWorkspaceClient(source *store.Client, target *desktop.Workspace, d
 		return nil
 	}
 
-	sourceCenter := source.Latest.Dimensions.Geometry.Center()
 	var selected *store.Client
-	minPrimary, minSecondary := 0, 0
+	var best common.DirectionScore
 
 	for _, c := range target.VisibleClients() {
 		if c == nil {
 			continue
 		}
 
-		center := c.Latest.Dimensions.Geometry.Center()
-		dx, dy := center.X-sourceCenter.X, center.Y-sourceCenter.Y
-		primary, secondary := 0, 0
-
-		switch d {
-		case common.Up, common.Down:
-			primary, secondary = common.AbsInt(dx), common.AbsInt(dy)
-		case common.Left, common.Right:
-			primary, secondary = common.AbsInt(dy), common.AbsInt(dx)
+		score, ok := common.ScoreDirection(source.Latest.Dimensions.Geometry, c.Latest.Dimensions.Geometry, d)
+		if !ok {
+			continue
 		}
-
-		if selected == nil || primary < minPrimary || (primary == minPrimary && secondary < minSecondary) {
+		if selected == nil || common.BetterDirectionScore(score, best) {
 			selected = c
-			minPrimary = primary
-			minSecondary = secondary
+			best = score
 		}
 	}
 
@@ -425,7 +417,7 @@ func MoveDirectionWindow(tr *desktop.Tracker, ws *desktop.Workspace, d common.Di
 	if active == nil {
 		return false
 	}
-	movePointer := pointerInsideClient(active)
+	movePointer := shouldWarpPointer(active)
 
 	target := ws.ActiveLayout().DirectionClient(d)
 	if target == nil {
@@ -439,6 +431,7 @@ func MoveDirectionWindow(tr *desktop.Tracker, ws *desktop.Workspace, d common.Di
 
 	ws.ActiveLayout().SwapClient(active, target)
 	tr.Tile(ws)
+	store.ActiveWindowSet(store.X, active.Window)
 	if movePointer {
 		store.PointerMove(store.X, targetCenter)
 	}
@@ -504,6 +497,10 @@ func pointerInsideClient(c *store.Client) bool {
 		common.IsInsideRect(store.Pointer.Position, c.Latest.Dimensions.Geometry)
 }
 
+func shouldWarpPointer(c *store.Client) bool {
+	return common.Config.WindowPointerWarp && pointerInsideClient(c)
+}
+
 func NextPosition(tr *desktop.Tracker, ws *desktop.Workspace) bool {
 	if ws.TilingDisabled() {
 		return false
@@ -519,6 +516,7 @@ func NextPosition(tr *desktop.Tracker, ws *desktop.Workspace) bool {
 
 	ws.ActiveLayout().SwapClient(c1, c2)
 	tr.Tile(ws)
+	store.ActiveWindowSet(store.X, c1.Window)
 
 	return true
 }
@@ -538,6 +536,7 @@ func PreviousPosition(tr *desktop.Tracker, ws *desktop.Workspace) bool {
 
 	ws.ActiveLayout().SwapClient(c1, c2)
 	tr.Tile(ws)
+	store.ActiveWindowSet(store.X, c1.Window)
 
 	return true
 }
@@ -578,7 +577,7 @@ func MoveWindowToScreen(tr *desktop.Tracker, c *store.Client, screen uint32) boo
 		return false
 	}
 
-	movePointer := pointerInsideClient(c)
+	movePointer := shouldWarpPointer(c)
 	if !c.MoveToScreenDirect(screen) {
 		return false
 	}
