@@ -20,10 +20,12 @@ import (
 )
 
 var (
-	clicked bool          // Tray clicked state from dbus
-	button  store.XButton // Pointer button state of device
-	click   *time.Timer   // Timer to compress pointer events
-	menu    *Menu         // Items collection of systray menu
+	clicked     bool          // Tray clicked state from dbus
+	button      store.XButton // Pointer button state of device
+	click       *time.Timer   // Timer to compress pointer events
+	menu        *Menu         // Items collection of systray menu
+	monitorConn *dbus.Conn    // Dedicated monitoring dbus connection
+	trayDone    chan struct{}  // Closed when the systray goroutine finishes cleanup
 )
 
 type Menu struct {
@@ -37,11 +39,52 @@ func BindTray(tr *desktop.Tracker) {
 		return
 	}
 
-	// Start systray icon
-	go systray.Run(func() {
-		items(tr)
-		messages(tr)
-	}, func() {})
+	trayDone = make(chan struct{})
+
+	// Before exec/exit, tell the systray goroutine to quit and wait for it to
+	// close its dbus connection. This ensures the dbus daemon releases
+	// org.kde.StatusNotifierItem-<PID>-1 before the new process tries to claim it.
+	// We must wait synchronously because syscall.Exec kills goroutines atomically.
+	OnShutdown(func() {
+		systray.Quit()
+		<-trayDone
+	})
+
+	// onExit runs inside nativeEnd(), before instance.conn.Close(). We close
+	// the session bus here first so the dbus daemon releases the name immediately,
+	// then signal trayDone so the shutdown callback can proceed to exec.
+	onExit := func() {
+		if monitorConn != nil {
+			monitorConn.Close()
+			monitorConn = nil
+		}
+		if conn, err := dbus.SessionBus(); err == nil && conn.Connected() {
+			conn.Close()
+		}
+		close(trayDone)
+	}
+
+	// Wrap systray.Run in a goroutine with recover() because nativeEnd() calls
+	// instance.conn.Close() after onExit returns, which panics if nativeStart()
+	// previously failed and instance.conn is nil. The recover keeps exec from
+	// being blocked by a panic in the systray goroutine.
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Warn("Systray shutdown panic (dbus connection may not have been initialized): ", r)
+			}
+			// Ensure trayDone is always closed even if onExit didn't run.
+			select {
+			case <-trayDone:
+			default:
+				close(trayDone)
+			}
+		}()
+		systray.Run(func() {
+			items(tr)
+			messages(tr)
+		}, onExit)
+	}()
 
 	// Attach execute events
 	OnExecute(func(action string, desktop uint, screen uint) {
@@ -240,12 +283,13 @@ func messages(tr *desktop.Tracker) {
 	}
 
 	// Monitor method calls in separate session
-	conn, err = dbus.ConnectSessionBus()
-	if err != nil {
-		log.Warn("Error initializing tray methods: ", err)
+	var merr error
+	monitorConn, merr = dbus.ConnectSessionBus()
+	if merr != nil {
+		log.Warn("Error initializing tray methods: ", merr)
 		return
 	}
-	call := conn.BusObject().Call("org.freedesktop.DBus.Monitoring.BecomeMonitor", 0, []string{
+	call := monitorConn.BusObject().Call("org.freedesktop.DBus.Monitoring.BecomeMonitor", 0, []string{
 		fmt.Sprintf("type='method_call',path='/StatusNotifierMenu',interface='com.canonical.dbusmenu',destination='%s'", destination),
 		fmt.Sprintf("type='method_call',path='/StatusNotifierItem',interface='org.kde.StatusNotifierItem',destination='%s'", destination),
 	}, uint(0))
@@ -256,7 +300,7 @@ func messages(tr *desktop.Tracker) {
 
 	// Listen to channel events
 	ch := make(chan *dbus.Message, 10)
-	conn.Eavesdrop(ch)
+	monitorConn.Eavesdrop(ch)
 
 	go func() {
 		var iface string
