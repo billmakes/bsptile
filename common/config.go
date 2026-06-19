@@ -29,6 +29,7 @@ type Configuration struct {
 	TilingIcon          [][]string        `toml:"tiling_icon"`           // Menu entries of systray
 	WindowIgnore        [][]string        `toml:"window_ignore"`         // Regex to ignore windows
 	WindowGapSize       int               `toml:"window_gap_size"`       // Gap size between windows
+	WindowOuterGap      int               `toml:"window_outer_gap"`      // Gap size around the outer edge of the tiling zone
 	WindowFocusDelay    int               `toml:"window_focus_delay"`    // Window focus delay when hovered
 	WindowPointerWarp   bool              `toml:"window_pointer_warp"`   // Move pointer with keyboard window actions
 	WindowFloatingAbove bool              `toml:"window_floating_above"` // Keep eligible unmanaged windows above tiled windows

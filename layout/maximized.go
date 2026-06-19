@@ -33,7 +33,7 @@ func (l *MaximizedLayout) Apply() {
 		return
 	}
 
-	target := MaximizedGeometry(*store.DesktopGeometry(l.Location.Screen), common.Config.WindowGapSize)
+	target := MaximizedGeometry(outerGapGeometry(*store.DesktopGeometry(l.Location.Screen)), common.Config.WindowGapSize)
 
 	log.Info("Tile active window with ", l.Name, " layout [workspace-", l.Location.Desktop, "-", l.Location.Screen, "]")
 
