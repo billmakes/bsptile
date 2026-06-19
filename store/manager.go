@@ -330,6 +330,11 @@ func (mg *Manager) applyNode(node *Node, geom common.Geometry) {
 		node.Client.Limit(w, h)
 		node.Client.MoveWindow(x, y, w, h)
 		node.Client.Latest.Dimensions.Geometry = common.Geometry{X: x, Y: y, Width: w, Height: h}
+		// MoveWindow calls c.Update() which reads geometry from X. Because the
+		// window manager processes moves asynchronously, the X readback may
+		// return the pre-move position and set Location.Screen to the old screen.
+		// Override it from the manager's authoritative location.
+		node.Client.Latest.Location.Screen = mg.Location.Screen
 		return
 	}
 
