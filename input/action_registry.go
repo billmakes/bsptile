@@ -14,6 +14,11 @@ type ActionSpec struct {
 	Handler     func(*desktop.Tracker, *desktop.Workspace) bool
 }
 
+type ActionInfo struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
 var (
 	actionRegistry     map[string]ActionSpec
 	actionRegistryOnce sync.Once
@@ -27,6 +32,7 @@ func buildActionRegistry() map[string]ActionSpec {
 		{Name: "decoration", Description: "toggle window decorations", Handler: ToggleDecoration},
 		{Name: "restore", Description: "restore window geometry", Handler: Restore},
 		{Name: "reset", Description: "reset BSP split ratios", Handler: Reset},
+		{Name: "close", Description: "close active window", Handler: CloseWindow},
 		{Name: "balance", Description: "balance the BSP tree", Handler: Balance},
 		{Name: "tree_rotate", Description: "rotate the BSP tree", Handler: RotateTree},
 		{Name: "layout_bsp", Description: "activate BSP layout", Handler: BSPLayout},
@@ -48,6 +54,8 @@ func buildActionRegistry() map[string]ActionSpec {
 		{Name: "screen_previous", Description: "move window to previous screen", Handler: PreviousScreen},
 		{Name: "window_to_desktop_next", Description: "move window to next desktop", Handler: NextDesktop},
 		{Name: "window_to_desktop_previous", Description: "move window to previous desktop", Handler: PreviousDesktop},
+		{Name: "desktop_next", Description: "switch to next desktop", Handler: NextDesktopView},
+		{Name: "desktop_previous", Description: "switch to previous desktop", Handler: PreviousDesktopView},
 		{Name: "proportion_increase", Description: "increase active split ratio", Handler: IncreaseProportion},
 		{Name: "proportion_decrease", Description: "decrease active split ratio", Handler: DecreaseProportion},
 		{Name: "resize_left", Description: "resize active window left", Handler: resizeAction(common.Left)},
@@ -83,6 +91,29 @@ func ActionNames() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+func ActionInfos() []ActionInfo {
+	registry := actions()
+	infos := make([]ActionInfo, 0, len(registry)+1)
+	for _, spec := range registry {
+		infos = append(infos, ActionInfo{
+			Name:        spec.Name,
+			Description: spec.Description,
+		})
+	}
+	infos = append(infos, ActionInfo{
+		Name:        "window_to_desktop_<n>",
+		Description: "move window to numbered desktop",
+	})
+	infos = append(infos, ActionInfo{
+		Name:        "desktop_<n>",
+		Description: "switch to numbered desktop",
+	})
+	sort.Slice(infos, func(i, j int) bool {
+		return infos[i].Name < infos[j].Name
+	})
+	return infos
 }
 
 func actions() map[string]ActionSpec {

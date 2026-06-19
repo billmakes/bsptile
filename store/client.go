@@ -105,9 +105,6 @@ func (c *Client) UnLimit() bool {
 }
 
 func (c *Client) Decorate() bool {
-	if _, exists := common.Config.Keys["decoration"]; !exists {
-		return false
-	}
 	if motif.Decor(&c.Latest.Dimensions.Hints.Motif) || !motif.Decor(&c.Original.Dimensions.Hints.Motif) {
 		return false
 	}
@@ -122,9 +119,6 @@ func (c *Client) Decorate() bool {
 }
 
 func (c *Client) UnDecorate() bool {
-	if _, exists := common.Config.Keys["decoration"]; !exists {
-		return false
-	}
 	if !motif.Decor(&c.Latest.Dimensions.Hints.Motif) && motif.Decor(&c.Original.Dimensions.Hints.Motif) {
 		return false
 	}

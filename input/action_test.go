@@ -119,3 +119,48 @@ func TestHoverFocusUsesOnlyManagedTopmostWindow(t *testing.T) {
 		t.Fatal("hover focus accepted unmanaged topmost window")
 	}
 }
+
+func TestSwitchDesktopRejectsInvalidTargetsWithoutX(t *testing.T) {
+	previousWorkplace := store.Workplace
+	previousX := store.X
+	t.Cleanup(func() {
+		store.Workplace = previousWorkplace
+		store.X = previousX
+	})
+
+	store.X = nil
+	store.Workplace = &store.XWorkplace{DesktopCount: 2, CurrentDesktop: 0}
+
+	if SwitchDesktop(2) {
+		t.Fatal("out-of-range desktop switch succeeded")
+	}
+	if SwitchDesktop(0) {
+		t.Fatal("same-desktop switch succeeded")
+	}
+	if ok, handled := tryNumberedAction("desktop_0", nil, nil); !handled || ok {
+		t.Fatalf("desktop_0 = ok %v handled %v, want handled failure", ok, handled)
+	}
+	if ok, handled := tryNumberedAction("desktop_x", nil, nil); !handled || ok {
+		t.Fatalf("desktop_x = ok %v handled %v, want handled failure", ok, handled)
+	}
+	if _, handled := tryNumberedAction("not_desktop_1", nil, nil); handled {
+		t.Fatal("unrelated action was handled as numbered desktop action")
+	}
+}
+
+func TestActiveActionWindowFallsBackToCachedActiveWindow(t *testing.T) {
+	previousX := store.X
+	previousWindows := store.Windows
+	t.Cleanup(func() {
+		store.X = previousX
+		store.Windows = previousWindows
+	})
+
+	store.X = nil
+	store.Windows = &store.XWindows{Active: store.XWindow{Id: 42}}
+
+	w := activeActionWindow(nil)
+	if w == nil || w.Id != 42 {
+		t.Fatalf("activeActionWindow = %+v, want cached active window 42", w)
+	}
+}

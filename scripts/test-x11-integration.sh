@@ -26,7 +26,6 @@ cat >"$config" <<'EOF'
 tiling_enabled = true
 tiling_gui = 0
 tiling_icon = []
-keybindings_enabled = false
 window_ignore = []
 window_gap_size = 4
 window_focus_delay = 0
@@ -39,15 +38,16 @@ edge_margin = [0, 0, 0, 0]
 edge_margin_primary = [0, 0, 0, 0]
 drop_target_width = 2
 
-[keys]
-[mouse]
-[modes]
 [systray]
 
 [[window_rules]]
 class = "^StickyTest$"
 sticky = true
 monitor = 1
+
+[[workspace_rules]]
+desktop = 2
+tiling = false
 EOF
 
 export BSPTILE_TEST_ROOT="$root"
@@ -66,16 +66,18 @@ dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24 -nolisten tcp" \
         wm_pid=$!
         tiled_pid=
         second_pid=
+        close_pid=
         sticky_pid=
+        disabled_pid=
         daemon_pid=
 
         cleanup_inner() {
             if [[ -n ${daemon_pid:-} ]]; then
                 kill "$daemon_pid" 2>/dev/null || true
             fi
-            kill "${tiled_pid:-}" "${second_pid:-}" "${sticky_pid:-}" 2>/dev/null || true
+            kill "${tiled_pid:-}" "${second_pid:-}" "${close_pid:-}" "${sticky_pid:-}" "${disabled_pid:-}" 2>/dev/null || true
             kill "$wm_pid" 2>/dev/null || true
-            wait "${tiled_pid:-}" "${second_pid:-}" "${sticky_pid:-}" 2>/dev/null || true
+            wait "${tiled_pid:-}" "${second_pid:-}" "${close_pid:-}" "${sticky_pid:-}" "${disabled_pid:-}" 2>/dev/null || true
             wait "$wm_pid" 2>/dev/null || true
         }
         trap cleanup_inner EXIT
@@ -121,7 +123,25 @@ dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24 -nolisten tcp" \
         layout_is() {
             local expected=$1
             [[ $("$root/bsptilectl" --socket "$BSPTILE_TEST_SOCKET" query workspaces |
-                jq ".data[0].Layout") == "$expected" ]]
+                jq ".data[] | select(.Location.Desktop == 0 and .Location.Screen == 0) | .Layout") == "$expected" ]]
+        }
+
+        desktop_is() {
+            local window=$1
+            local expected=$2
+            xprop -id "$window" _NET_WM_DESKTOP 2>/dev/null |
+                grep -Eq " = $expected$"
+        }
+
+        active_desktop_is() {
+            local expected=$1
+            wmctrl -d 2>/dev/null | grep -Eq "^$expected[[:space:]]+\\*"
+        }
+
+        bsptile_desktop_is() {
+            local expected=$1
+            [[ $("$root/bsptilectl" --socket "$BSPTILE_TEST_SOCKET" query workplace |
+                jq ".data.CurrentDesktop") == "$expected" ]]
         }
 
         for _ in $(seq 1 100); do
@@ -169,13 +189,40 @@ dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24 -nolisten tcp" \
         "$root/bsptilectl" --socket "$BSPTILE_TEST_SOCKET" query workplace |
             grep -q "\"ok\":true"
         "$root/bsptilectl" --socket "$BSPTILE_TEST_SOCKET" query config |
-            grep -q "\"KeybindingsEnabled\":false"
+            grep -q "\"TilingEnabled\":true"
+        "$root/bsptilectl" --socket "$BSPTILE_TEST_SOCKET" actions |
+            jq -e ".ok == true and any(.data[]; .name == \"toggle\")" >/dev/null
+        "$root/bsptilectl" --socket "$BSPTILE_TEST_SOCKET" action --list |
+            jq -e ".ok == true and any(.data[]; .name == \"window_to_desktop_<n>\")" >/dev/null
+        "$root/bsptilectl" --socket "$BSPTILE_TEST_SOCKET" actions |
+            jq -e ".ok == true and any(.data[]; .name == \"desktop_<n>\")" >/dev/null
         "$root/bsptilectl" --socket "$BSPTILE_TEST_SOCKET" reload |
             grep -q "\"ok\":true"
 
         tiled_window=$(xdotool search --sync --class TiledTest | head -1)
         xdotool windowactivate --sync "$tiled_window"
         wait_for "initial tracked window" client_count_is 1
+        wait_for "initial active desktop" active_desktop_is 0
+
+        # Desktop actions switch the visible desktop without moving the
+        # active window. Numbered actions are 1-indexed.
+        "$root/bsptilectl" --socket "$BSPTILE_TEST_SOCKET" action desktop_2 |
+            grep -q "\"ok\":true"
+        wait_for "desktop_2 switches view" active_desktop_is 1
+        wait_for "bsptile sees desktop 2" bsptile_desktop_is 1
+        wait_for "desktop switch leaves window on desktop 1" desktop_is "$tiled_window" 0
+        "$root/bsptilectl" --socket "$BSPTILE_TEST_SOCKET" action desktop_previous |
+            grep -q "\"ok\":true"
+        wait_for "desktop_previous switches view" active_desktop_is 0
+        wait_for "bsptile sees desktop 1 after previous" bsptile_desktop_is 0
+        "$root/bsptilectl" --socket "$BSPTILE_TEST_SOCKET" action desktop_next |
+            grep -q "\"ok\":true"
+        wait_for "desktop_next switches view" active_desktop_is 1
+        wait_for "bsptile sees desktop 2 after next" bsptile_desktop_is 1
+        "$root/bsptilectl" --socket "$BSPTILE_TEST_SOCKET" action desktop_1 |
+            grep -q "\"ok\":true"
+        wait_for "desktop_1 switches view" active_desktop_is 0
+        wait_for "bsptile sees desktop 1 after numbered switch" bsptile_desktop_is 0
 
         # A single BSP client uses half-gap placement (x=2); maximized uses
         # a full gap on each edge (x=4), then toggles back to BSP.
@@ -214,6 +261,18 @@ dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24 -nolisten tcp" \
         second_pid=
         wait_for "second window removal" client_count_is 1
 
+        # Close action: requests a graceful EWMH close for the active window.
+        xterm -class CloseTest -name close-test -geometry 80x24+140+140 >/dev/null 2>&1 &
+        close_pid=$!
+        close_window=$(xdotool search --sync --class CloseTest | head -1)
+        xdotool windowactivate --sync "$close_window"
+        wait_for "close-test tracked window" client_count_is 2
+        "$root/bsptilectl" --socket "$BSPTILE_TEST_SOCKET" action close |
+            grep -q "\"ok\":true"
+        wait_for "close action removes active window" client_count_is 1
+        wait "$close_pid" 2>/dev/null || true
+        close_pid=
+
         # Sticky rules are unmanaged, always above, and assigned to all
         # desktops. They must not enter the BSP client list.
         xterm -class StickyTest -name sticky-test -geometry 40x10+200+200 >/dev/null 2>&1 &
@@ -224,6 +283,22 @@ dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24 -nolisten tcp" \
         wait_for "all-desktops assignment" bash -c \
             "xprop -id $sticky_window _NET_WM_DESKTOP | grep -Eqi \"0xffffffff|4294967295\""
         client_count_is 1
+
+        # Workspace rules may disable tiling/tracking entirely, but IPC
+        # desktop-send actions must still operate on the real active X window.
+        wmctrl -s 1
+        wait_for "switch to disabled desktop" bash -c \
+            "wmctrl -d | grep -Eq \"^1[[:space:]]+\\*\""
+        xterm -class DisabledTest -name disabled-test -geometry 60x12+240+240 >/dev/null 2>&1 &
+        disabled_pid=$!
+        disabled_window=$(xdotool search --sync --class DisabledTest | head -1)
+        xdotool windowactivate --sync "$disabled_window"
+        wait_for "disabled workspace window assigned to desktop 2" desktop_is "$disabled_window" 1
+        client_count_is 1
+        "$root/bsptilectl" --socket "$BSPTILE_TEST_SOCKET" action window_to_desktop_1 |
+            grep -q "\"ok\":true"
+        wait_for "send disabled workspace window to desktop 1" desktop_is "$disabled_window" 0
+        wait_for "sent disabled window becomes tracked" client_count_is 2
 
         "$root/bsptilectl" --socket "$BSPTILE_TEST_SOCKET" wm exit |
             grep -q "\"ok\":true"

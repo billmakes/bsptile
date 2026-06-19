@@ -30,11 +30,19 @@ func Bind(tr *desktop.Tracker) {
 		})
 	})
 	BindSignal(tr)
-	BindMouse(tr)
-	BindKeys(tr)
+	BindPointer(tr)
+	BindActionChannel(tr)
 	BindTray(tr)
 	BindDbus(tr)
 	BindAddons(tr)
+}
+
+func BindActionChannel(tr *desktop.Tracker) {
+	go func() {
+		for action := range tr.Channels.Action {
+			ExecuteActiveAction(action, tr)
+		}
+	}()
 }
 
 func ExecuteAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) bool {
@@ -70,11 +78,6 @@ func executeAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) bo
 
 	log.Info("Execute action ", action, " [", ws.Name, "]")
 
-	// Choose action command
-	if mode, ok := keyModeAction(action); ok {
-		success = SetKeyMode(mode, tr)
-		goto complete
-	}
 	if spec, ok := LookupAction(action); ok {
 		success = spec.Handler(tr, ws)
 	} else {
@@ -85,7 +88,6 @@ func executeAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) bo
 		}
 	}
 
-complete:
 	time.AfterFunc(100*time.Millisecond, func() {
 		tr.Post(tr.Handlers.Reset)
 	})
@@ -235,6 +237,33 @@ func Reset(tr *desktop.Tracker, ws *desktop.Workspace) bool {
 	ui.UpdateIcon(ws)
 
 	return true
+}
+
+func CloseWindow(tr *desktop.Tracker, ws *desktop.Workspace) bool {
+	w := activeActionWindow(tr)
+	if w == nil || w.Id == 0 {
+		return false
+	}
+	return store.CloseXWindow(w.Id)
+}
+
+func activeActionWindow(tr *desktop.Tracker) *store.XWindow {
+	if store.X != nil {
+		active := store.ActiveWindowGet(store.X)
+		if active.Id != 0 {
+			store.ActiveWindowUpdate(&active)
+			return &active
+		}
+	}
+	if tr != nil {
+		if c := tr.RefreshActiveClient(); c != nil {
+			return c.Window
+		}
+	}
+	if store.Windows != nil && store.Windows.Active.Id != 0 {
+		return &store.Windows.Active
+	}
+	return nil
 }
 
 func Balance(tr *desktop.Tracker, ws *desktop.Workspace) bool {
@@ -671,17 +700,63 @@ func PreviousDesktop(tr *desktop.Tracker, ws *desktop.Workspace) bool {
 	return MoveWindowToDesktop(tr, c, uint32(prev))
 }
 
+func NextDesktopView(tr *desktop.Tracker, ws *desktop.Workspace) bool {
+	if store.Workplace == nil {
+		return false
+	}
+	next := int(store.Workplace.CurrentDesktop) + 1
+	if next > int(store.Workplace.DesktopCount)-1 {
+		return false
+	}
+	return SwitchDesktop(uint(next))
+}
+
+func PreviousDesktopView(tr *desktop.Tracker, ws *desktop.Workspace) bool {
+	if store.Workplace == nil {
+		return false
+	}
+	prev := int(store.Workplace.CurrentDesktop) - 1
+	if prev < 0 {
+		return false
+	}
+	return SwitchDesktop(uint(prev))
+}
+
+func SwitchDesktop(desktop uint) bool {
+	if store.X == nil || store.Workplace == nil || desktop >= store.Workplace.DesktopCount {
+		return false
+	}
+	if store.Workplace.CurrentDesktop == desktop {
+		return false
+	}
+	store.CurrentDesktopSet(store.X, desktop)
+	return store.Workplace.CurrentDesktop == desktop
+}
+
 // activeSendCandidate returns the client to use for cross-desktop sends.
 // Tracked clients are preferred, but on workspaces with tiling disabled the
 // tracker deliberately skips Update(), so tr.ActiveClient() is nil. In that
 // case we wrap the EWMH active window in a transient Client — enough to read
 // its current desktop and write _NET_WM_DESKTOP, no BSP-tree role.
 func activeSendCandidate(tr *desktop.Tracker) *store.Client {
-	if c := tr.ActiveClient(); c != nil {
+	if c := tr.RefreshActiveClient(); c != nil {
 		return c
+	}
+	if store.X != nil && store.Workplace != nil {
+		active := store.ActiveWindowGet(store.X)
+		if active.Id != 0 {
+			store.ActiveWindowUpdate(&active)
+			return store.CreateClient(active.Id)
+		}
+	}
+	if store.Windows == nil {
+		return nil
 	}
 	id := store.Windows.Active.Id
 	if id == 0 {
+		return nil
+	}
+	if store.X == nil || store.Workplace == nil {
 		return nil
 	}
 	return store.CreateClient(id)
@@ -707,15 +782,25 @@ func MoveWindowToDesktop(tr *desktop.Tracker, c *store.Client, desktop uint32) b
 // didn't match anything we understand and the default branch should fall
 // through to External.
 func tryNumberedAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) (bool, bool) {
-	const prefix = "window_to_desktop_"
-	if !strings.HasPrefix(action, prefix) {
-		return false, false
+	const windowPrefix = "window_to_desktop_"
+	if strings.HasPrefix(action, windowPrefix) {
+		n, err := strconv.Atoi(strings.TrimPrefix(action, windowPrefix))
+		if err != nil || n < 1 {
+			return false, true
+		}
+		return MoveWindowToDesktop(tr, activeSendCandidate(tr), uint32(n-1)), true
 	}
-	n, err := strconv.Atoi(strings.TrimPrefix(action, prefix))
-	if err != nil || n < 1 {
-		return false, false
+
+	const desktopPrefix = "desktop_"
+	if strings.HasPrefix(action, desktopPrefix) {
+		n, err := strconv.Atoi(strings.TrimPrefix(action, desktopPrefix))
+		if err != nil || n < 1 {
+			return false, true
+		}
+		return SwitchDesktop(uint(n - 1)), true
 	}
-	return MoveWindowToDesktop(tr, activeSendCandidate(tr), uint32(n-1)), true
+
+	return false, false
 }
 
 func MoveWindowToScreen(tr *desktop.Tracker, c *store.Client, screen uint32) bool {
@@ -852,9 +937,6 @@ func ReloadConfig(tr *desktop.Tracker) bool {
 	if !common.ReloadConfig() {
 		return false
 	}
-
-	ReloadKeys(tr)
-	ReloadMouseBindings(tr)
 
 	for _, ws := range tr.Workspaces {
 		wasEnabled := ws.TilingEnabled()

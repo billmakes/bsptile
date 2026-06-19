@@ -249,6 +249,10 @@ func CurrentDesktopSet(X *xgbutil.XUtil, desktop uint) {
 }
 
 func ActiveWindowGet(X *xgbutil.XUtil) XWindow {
+	if X == nil || Windows == nil {
+		return XWindow{}
+	}
+
 	active, err := ewmh.ActiveWindowGet(X)
 
 	// Validate active window

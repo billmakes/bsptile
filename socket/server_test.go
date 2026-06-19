@@ -65,6 +65,53 @@ func TestValidActionModifier(t *testing.T) {
 	}
 }
 
+func TestServerQueryActions(t *testing.T) {
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	resp := sendRequest(t, srv.Path, proto.Request{Cmd: proto.CmdQuery, Target: proto.QueryActions})
+	if !resp.OK {
+		t.Fatalf("query actions failed: %s", resp.Error)
+	}
+	actions, ok := resp.Data.([]interface{})
+	if !ok || len(actions) == 0 {
+		t.Fatalf("actions payload = %#v, want non-empty array", resp.Data)
+	}
+	foundToggle := false
+	foundDesktopPattern := false
+	foundDesktopSwitchPattern := false
+	for _, entry := range actions {
+		action, ok := entry.(map[string]interface{})
+		if !ok {
+			t.Fatalf("action entry = %#v, want object", entry)
+		}
+		switch action["name"] {
+		case "close":
+			if action["description"] == "" {
+				t.Fatal("close action is missing description")
+			}
+		case "toggle":
+			foundToggle = true
+			if action["description"] == "" {
+				t.Fatal("toggle action is missing description")
+			}
+		case "window_to_desktop_<n>":
+			foundDesktopPattern = true
+		case "desktop_<n>":
+			foundDesktopSwitchPattern = true
+		}
+	}
+	if !foundToggle {
+		t.Fatal("actions payload missing toggle")
+	}
+	if !foundDesktopPattern {
+		t.Fatal("actions payload missing dynamic desktop-send pattern")
+	}
+	if !foundDesktopSwitchPattern {
+		t.Fatal("actions payload missing dynamic desktop-switch pattern")
+	}
+}
+
 func TestServerSubscribeAcksThenStreamsEvents(t *testing.T) {
 	srv := newTestServer(t)
 	defer srv.Close()

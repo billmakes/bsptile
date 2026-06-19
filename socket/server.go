@@ -144,9 +144,17 @@ func validActionModifier(mod string) bool {
 func (s *Server) handleQuery(conn net.Conn, req proto.Request) {
 	target := req.Target
 	var data interface{}
-	s.Tracker.Call(func() {
+	if target == proto.QueryActions {
 		data = s.queryPayload(target)
-	})
+	} else {
+		if s.Tracker == nil {
+			writeResponse(conn, proto.Response{Error: "query requires tracker"})
+			return
+		}
+		s.Tracker.Call(func() {
+			data = s.queryPayload(target)
+		})
+	}
 	if data == nil {
 		writeResponse(conn, proto.Response{Error: "unknown query target: " + target})
 		return
@@ -162,6 +170,7 @@ func (s *Server) queryPayload(target string) interface{} {
 			proto.QueryClients:    maps.Values(s.Tracker.Clients),
 			proto.QueryWorkplace:  store.Workplace,
 			proto.QueryConfig:     common.Config,
+			proto.QueryActions:    s.payloadForTopic(proto.QueryActions),
 		}
 	}
 	return s.payloadForTopic(target)
@@ -183,6 +192,8 @@ func (s *Server) payloadForTopic(name string) interface{} {
 		return store.Workplace
 	case proto.QueryConfig:
 		return common.Config
+	case proto.QueryActions:
+		return input.ActionInfos()
 	}
 	return nil
 }

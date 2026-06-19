@@ -62,6 +62,14 @@ func RequestActiveWindow(window xproto.Window) bool {
 	return true
 }
 
+func CloseXWindow(window xproto.Window) bool {
+	if err := ewmh.CloseWindow(X, window); err != nil {
+		log.Warn("Error requesting window close for ", window, ": ", err)
+		return false
+	}
+	return true
+}
+
 func SetCurrentDesktop(desktop uint) bool {
 	if err := ewmh.CurrentDesktopSet(X, desktop); err != nil {
 		log.Warn("Error setting current desktop ", desktop, ": ", err)

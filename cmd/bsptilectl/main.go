@@ -96,9 +96,18 @@ func buildRequest(args []string) (proto.Request, bool, error) {
 	rest := args[1:]
 
 	switch cmd {
+	case proto.QueryActions:
+		if len(rest) != 0 {
+			return proto.Request{}, false, fmt.Errorf("actions: unexpected args")
+		}
+		return proto.Request{Cmd: proto.CmdQuery, Target: proto.QueryActions}, false, nil
+
 	case proto.CmdAction:
 		if len(rest) == 0 {
 			return proto.Request{}, false, fmt.Errorf("action: missing name")
+		}
+		if len(rest) == 1 && (rest[0] == "--list" || rest[0] == "list") {
+			return proto.Request{Cmd: proto.CmdQuery, Target: proto.QueryActions}, false, nil
 		}
 		req := proto.Request{Cmd: proto.CmdAction, Name: rest[0]}
 		for i := 1; i < len(rest); i++ {
@@ -144,6 +153,8 @@ Usage:
 
 Commands:
   action <name> [--mod current|screens|workspaces]
+  action --list
+  actions
   query [workspaces|windows|clients|workplace|config]
   subscribe [topic...]
   reload

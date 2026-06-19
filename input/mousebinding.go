@@ -1,14 +1,8 @@
 package input
 
 import (
-	"strconv"
-	"strings"
 	"sync"
 	"time"
-
-	"github.com/jezek/xgbutil"
-	"github.com/jezek/xgbutil/mousebind"
-	"github.com/jezek/xgbutil/xevent"
 
 	"github.com/billmakes/bsptile/v2/common"
 	"github.com/billmakes/bsptile/v2/desktop"
@@ -26,10 +20,7 @@ var (
 	hoverID   uint64             // Invalidates stale hover callbacks
 )
 
-func BindMouse(tr *desktop.Tracker) {
-	mousebind.Initialize(store.X)
-	ReloadMouseBindings(tr)
-
+func BindPointer(tr *desktop.Tracker) {
 	poll(100, func() {
 		tr.Post(func() {
 			store.PointerUpdate(store.X)
@@ -47,42 +38,6 @@ func BindMouse(tr *desktop.Tracker) {
 			pointer = store.Pointer
 		})
 	})
-}
-
-func ReloadMouseBindings(tr *desktop.Tracker) {
-	mousebind.Detach(store.X, store.X.RootWin())
-
-	for action, bindings := range common.Config.Mouse {
-		for _, binding := range bindings {
-			if binding == "" {
-				continue
-			}
-			bindMouse(normalizeMouseBinding(binding), action, tr)
-		}
-	}
-}
-
-func bindMouse(binding string, action string, tr *desktop.Tracker) {
-	err := mousebind.ButtonPressFun(func(X *xgbutil.XUtil, ev xevent.ButtonPressEvent) {
-		ExecuteActions(action, tr, "current")
-	}).Connect(store.X, store.X.RootWin(), binding, false, true)
-
-	if err != nil {
-		log.Warn("Error on mouse action ", action, " [", binding, "]: ", err)
-	}
-}
-
-func normalizeMouseBinding(binding string) string {
-	parts := strings.Split(binding, "-")
-	last := parts[len(parts)-1]
-	if len(last) <= len("button") || !strings.EqualFold(last[:len("button")], "button") {
-		return binding
-	}
-	if button, err := strconv.ParseUint(last[len("button"):], 10, 8); err == nil && button > 0 {
-		parts[len(parts)-1] = strconv.FormatUint(button, 10)
-		return strings.Join(parts, "-")
-	}
-	return binding
 }
 
 func resetTracker(tr *desktop.Tracker) {

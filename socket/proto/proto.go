@@ -36,6 +36,7 @@ const (
 	QueryClients    = "clients"
 	QueryWorkplace  = "workplace"
 	QueryConfig     = "config"
+	QueryActions    = "actions"
 )
 
 // Window-manager operations.

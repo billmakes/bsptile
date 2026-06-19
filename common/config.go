@@ -3,12 +3,10 @@ package common
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sync"
 	"time"
-
-	"encoding/json"
-	"path/filepath"
 
 	"github.com/BurntSushi/toml"
 
@@ -25,28 +23,24 @@ var (
 )
 
 type Configuration struct {
-	TilingEnabled       bool                   `toml:"tiling_enabled"`        // Tile windows on startup
-	TilingGui           int                    `toml:"tiling_gui"`            // Time duration of gui
-	TilingIcon          [][]string             `toml:"tiling_icon"`           // Menu entries of systray
-	KeybindingsEnabled  bool                   `toml:"keybindings_enabled"`   // Register built-in global keyboard shortcuts
-	WindowIgnore        [][]string             `toml:"window_ignore"`         // Regex to ignore windows
-	WindowGapSize       int                    `toml:"window_gap_size"`       // Gap size between windows
-	WindowFocusDelay    int                    `toml:"window_focus_delay"`    // Window focus delay when hovered
-	WindowPointerWarp   bool                   `toml:"window_pointer_warp"`   // Move pointer with keyboard window actions
-	WindowFloatingAbove bool                   `toml:"window_floating_above"` // Keep eligible unmanaged windows above tiled windows
-	WindowDecoration    bool                   `toml:"window_decoration"`     // Show window decorations
-	ProportionStep      float64                `toml:"proportion_step"`       // BSP split ratio step
-	ProportionMin       float64                `toml:"proportion_min"`        // BSP split ratio minimum
-	EdgeMargin          []int                  `toml:"edge_margin"`           // Margin values of tiling area
-	EdgeMarginPrimary   []int                  `toml:"edge_margin_primary"`   // Margin values of primary tiling area
-	DropTargetWidth     int                    `toml:"drop_target_width"`     // Outline width (px) of drop-target indicator
-	Colors              map[string][]int       `toml:"colors"`                // List of color values for gui elements
-	Keys                map[string]KeyBindings `toml:"keys"`                  // Event bindings for keyboard shortcuts
-	Mouse               map[string]KeyBindings `toml:"mouse"`                 // Event bindings for mouse buttons
-	Modes               map[string]Mode        `toml:"modes"`                 // Alternate keyboard shortcut layers
-	Systray             map[string]string      `toml:"systray"`               // Event bindings for systray icon
-	WindowRules         []WindowRule           `toml:"window_rules"`          // Per-class/name overrides applied when a window is first tracked
-	WorkspaceRules      []WorkspaceRule        `toml:"workspace_rules"`       // Per-workspace initial state overrides
+	TilingEnabled       bool              `toml:"tiling_enabled"`        // Tile windows on startup
+	TilingGui           int               `toml:"tiling_gui"`            // Time duration of gui
+	TilingIcon          [][]string        `toml:"tiling_icon"`           // Menu entries of systray
+	WindowIgnore        [][]string        `toml:"window_ignore"`         // Regex to ignore windows
+	WindowGapSize       int               `toml:"window_gap_size"`       // Gap size between windows
+	WindowFocusDelay    int               `toml:"window_focus_delay"`    // Window focus delay when hovered
+	WindowPointerWarp   bool              `toml:"window_pointer_warp"`   // Move pointer with keyboard window actions
+	WindowFloatingAbove bool              `toml:"window_floating_above"` // Keep eligible unmanaged windows above tiled windows
+	WindowDecoration    bool              `toml:"window_decoration"`     // Show window decorations
+	ProportionStep      float64           `toml:"proportion_step"`       // BSP split ratio step
+	ProportionMin       float64           `toml:"proportion_min"`        // BSP split ratio minimum
+	EdgeMargin          []int             `toml:"edge_margin"`           // Margin values of tiling area
+	EdgeMarginPrimary   []int             `toml:"edge_margin_primary"`   // Margin values of primary tiling area
+	DropTargetWidth     int               `toml:"drop_target_width"`     // Outline width (px) of drop-target indicator
+	Colors              map[string][]int  `toml:"colors"`                // List of color values for gui elements
+	Systray             map[string]string `toml:"systray"`               // Event bindings for systray icon
+	WindowRules         []WindowRule      `toml:"window_rules"`          // Per-class/name overrides applied when a window is first tracked
+	WorkspaceRules      []WorkspaceRule   `toml:"workspace_rules"`       // Per-workspace initial state overrides
 }
 
 // WindowRule applies overrides to a freshly tracked window whose WM_CLASS
@@ -80,30 +74,6 @@ type WorkspaceRule struct {
 	Tiling     *bool  `toml:"tiling,omitempty"`     // override tiling_enabled
 	Layout     string `toml:"layout,omitempty"`     // "bsp" | "maximized" | "fullscreen"
 	Decoration *bool  `toml:"decoration,omitempty"` // override window_decoration
-}
-
-type KeyBindings []string
-type Mode map[string]KeyBindings
-
-func (keys *KeyBindings) UnmarshalTOML(value any) error {
-	switch value := value.(type) {
-	case string:
-		*keys = KeyBindings{value}
-	case []any:
-		bindings := make(KeyBindings, 0, len(value))
-		for _, item := range value {
-			binding, ok := item.(string)
-			if !ok {
-				return fmt.Errorf("key binding must be a string")
-			}
-			bindings = append(bindings, binding)
-		}
-		*keys = bindings
-	default:
-		return fmt.Errorf("key binding must be a string or array of strings")
-	}
-
-	return nil
 }
 
 func InitConfig() {
@@ -174,7 +144,7 @@ func readConfig(configFilePath string, initial bool) bool {
 
 	// Decode into a temporary value so an invalid file cannot partially update
 	// the running configuration.
-	config := Configuration{KeybindingsEnabled: true}
+	config := Configuration{}
 	_, err := toml.DecodeFile(configFilePath, &config)
 	if err != nil {
 		if initial {
@@ -194,15 +164,9 @@ func readConfig(configFilePath string, initial bool) bool {
 	}
 	Config = config
 
-	// Print shortcut infos
+	// Print action hook infos
 	if initial {
-		keys, _ := json.MarshalIndent(Config.Keys, "", "  ")
-		mouse, _ := json.MarshalIndent(Config.Mouse, "", "  ")
-		systray, _ := json.MarshalIndent(Config.Systray, "", "  ")
-
-		fmt.Printf("KEYS: %s\n", RemoveChars(string(keys), []string{"{", "}", "\"", ","}))
-		fmt.Printf("MOUSE: %s\n", RemoveChars(string(mouse), []string{"{", "}", "\"", ","}))
-		fmt.Printf("SYSTRAY: %s\n", RemoveChars(string(systray), []string{"{", "}", "\"", ","}))
+		fmt.Printf("SYSTRAY: %v\n", Config.Systray)
 	}
 
 	return true
@@ -262,15 +226,6 @@ func validateConfig(config Configuration) error {
 		}
 		if rule.Layout != "" && rule.Layout != "bsp" && rule.Layout != "maximized" && rule.Layout != "fullscreen" {
 			return fmt.Errorf("workspace_rules entry %d has invalid layout %q", i+1, rule.Layout)
-		}
-	}
-
-	for name, mode := range config.Modes {
-		if name == "" || name == "default" {
-			return fmt.Errorf("invalid key mode name %q", name)
-		}
-		if bindings := mode["mode_default"]; len(bindings) == 0 {
-			return fmt.Errorf("key mode %q must define mode_default", name)
 		}
 	}
 
