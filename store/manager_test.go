@@ -18,9 +18,14 @@ func testClient(id xproto.Window) *Client {
 
 func TestFloatingClassification(t *testing.T) {
 	previousIgnore := common.Config.WindowIgnore
+	previousPatterns := common.Config.WindowIgnorePatterns
 	common.Config.WindowIgnore = [][]string{{"ignored.*", ""}}
+	if err := common.CompileWindowIgnorePatterns(); err != nil {
+		t.Fatalf("compiling window_ignore patterns: %v", err)
+	}
 	t.Cleanup(func() {
 		common.Config.WindowIgnore = previousIgnore
+		common.Config.WindowIgnorePatterns = previousPatterns
 	})
 
 	tests := []struct {

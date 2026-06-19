@@ -27,7 +27,8 @@ func InitCache() {
 	cacheFolderPath := Args.Cache
 	if _, err := os.Stat(cacheFolderPath); os.IsNotExist(err) {
 		if err := os.MkdirAll(cacheFolderPath, 0755); err != nil {
-			log.Error("Error creating cache folder: ", err)
+			log.Error("Error creating cache folder, disabling cache: ", err)
+			Args.Cache = "disabled"
 		}
 	}
 }

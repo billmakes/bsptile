@@ -421,22 +421,6 @@ func (tr *Tracker) ToggleWindowFloating(w xproto.Window) bool {
 	return tr.SetWindowFloating(w, !tr.IsWindowFloating(w))
 }
 
-func (tr *Tracker) unlockClients() {
-	ws := tr.ActiveWorkspace()
-	if ws == nil {
-		return
-	}
-
-	// Unlock clients
-	mg := ws.ActiveLayout().GetManager()
-	for _, c := range mg.Clients(store.Stacked) {
-		if c == nil {
-			continue
-		}
-		c.UnLock()
-	}
-}
-
 func (tr *Tracker) trackWindow(w xproto.Window) bool {
 	if tr.isTracked(w) {
 		return false
@@ -810,9 +794,6 @@ func (tr *Tracker) onStateUpdate(state string, desktop uint, screen uint) {
 		store.HideDropIndicator()
 		tr.Handlers.Reset()
 
-		// Unlock clients
-		tr.unlockClients()
-
 		// Update trackable clients
 		tr.Update()
 	}
@@ -865,9 +846,6 @@ func (tr *Tracker) onPointerUpdate(pointer store.XPointer, desktop uint, screen 
 				store.HideDropIndicator()
 				tr.Handlers.MoveClient.Reset()
 				tr.Handlers.ResizeClient.Reset()
-
-				// Unlock clients
-				tr.unlockClients()
 
 				// Tile workspace
 				if buttonReleased {

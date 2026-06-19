@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -41,6 +42,13 @@ type Configuration struct {
 	Systray             map[string]string `toml:"systray"`               // Event bindings for systray icon
 	WindowRules         []WindowRule      `toml:"window_rules"`          // Per-class/name overrides applied when a window is first tracked
 	WorkspaceRules      []WorkspaceRule   `toml:"workspace_rules"`       // Per-workspace initial state overrides
+
+	WindowIgnorePatterns []WindowIgnorePattern // Pre-compiled window_ignore regexes (populated by validateConfig)
+}
+
+type WindowIgnorePattern struct {
+	Class *regexp.Regexp // compiled class pattern
+	Name  *regexp.Regexp // compiled name pattern (nil means match any name)
 }
 
 // WindowRule applies overrides to a freshly tracked window whose WM_CLASS
@@ -154,7 +162,7 @@ func readConfig(configFilePath string, initial bool) bool {
 		}
 		return false
 	}
-	if err := validateConfig(config); err != nil {
+	if err := validateConfig(&config); err != nil {
 		if initial {
 			log.Fatal("Error reading config file ", err)
 		} else {
@@ -172,19 +180,50 @@ func readConfig(configFilePath string, initial bool) bool {
 	return true
 }
 
-func validateConfig(config Configuration) error {
+// CompileWindowIgnorePatterns recompiles Config.WindowIgnorePatterns from
+// Config.WindowIgnore. Call this after directly mutating Config.WindowIgnore
+// (e.g. in tests) to keep the two fields in sync.
+func CompileWindowIgnorePatterns() error {
+	Config.WindowIgnorePatterns = Config.WindowIgnorePatterns[:0]
+	for i, entry := range Config.WindowIgnore {
+		if len(entry) != 2 {
+			return fmt.Errorf("window_ignore entry %d must contain class and name regexes", i+1)
+		}
+		classPattern, err := regexp.Compile(strings.ToLower(entry[0]))
+		if err != nil {
+			return fmt.Errorf("window_ignore entry %d has invalid class regex: %w", i+1, err)
+		}
+		pat := WindowIgnorePattern{Class: classPattern}
+		if entry[1] != "" {
+			namePattern, err := regexp.Compile(strings.ToLower(entry[1]))
+			if err != nil {
+				return fmt.Errorf("window_ignore entry %d has invalid name regex: %w", i+1, err)
+			}
+			pat.Name = namePattern
+		}
+		Config.WindowIgnorePatterns = append(Config.WindowIgnorePatterns, pat)
+	}
+	return nil
+}
+
+func validateConfig(config *Configuration) error {
 	for i, entry := range config.WindowIgnore {
 		if len(entry) != 2 {
 			return fmt.Errorf("window_ignore entry %d must contain class and name regexes", i+1)
 		}
-		if _, err := regexp.Compile(entry[0]); err != nil {
+		classPattern, err := regexp.Compile(strings.ToLower(entry[0]))
+		if err != nil {
 			return fmt.Errorf("window_ignore entry %d has invalid class regex: %w", i+1, err)
 		}
+		pat := WindowIgnorePattern{Class: classPattern}
 		if entry[1] != "" {
-			if _, err := regexp.Compile(entry[1]); err != nil {
+			namePattern, err := regexp.Compile(strings.ToLower(entry[1]))
+			if err != nil {
 				return fmt.Errorf("window_ignore entry %d has invalid name regex: %w", i+1, err)
 			}
+			pat.Name = namePattern
 		}
+		config.WindowIgnorePatterns = append(config.WindowIgnorePatterns, pat)
 	}
 
 	for i, rule := range config.WindowRules {

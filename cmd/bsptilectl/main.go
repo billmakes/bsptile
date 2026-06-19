@@ -67,11 +67,6 @@ func main() {
 	// don't mask a bad response by returning success.
 	var resp proto.Response
 	if jerr := json.Unmarshal(line, &resp); jerr != nil || !resp.OK {
-		if !stream {
-			os.Exit(1)
-		}
-		// On subscribe the server only keeps the conn open after OK, so
-		// a non-OK ack means there's nothing more to read.
 		os.Exit(1)
 	}
 

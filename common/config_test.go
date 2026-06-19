@@ -66,7 +66,7 @@ func TestValidateConfigRejectsMalformedWindowIgnore(t *testing.T) {
 		{WindowIgnore: [][]string{{"valid", "["}}},
 	}
 	for _, config := range tests {
-		if err := validateConfig(config); err == nil {
+		if err := validateConfig(&config); err == nil {
 			t.Fatalf("expected invalid window_ignore to be rejected: %#v", config.WindowIgnore)
 		}
 	}
@@ -87,7 +87,7 @@ func TestValidateConfigRejectsInvalidRules(t *testing.T) {
 		{WorkspaceRules: []WorkspaceRule{{Desktop: 1, Layout: "unknown"}}},
 	}
 	for _, config := range tests {
-		if err := validateConfig(config); err == nil {
+		if err := validateConfig(&config); err == nil {
 			t.Fatalf("expected invalid rule configuration to be rejected: %#v", config)
 		}
 	}

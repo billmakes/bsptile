@@ -124,6 +124,7 @@ func runMain() {
 		if _, err := socket.Init(tr); err != nil {
 			log.Warn("Error starting control socket: ", err)
 		}
+		input.OnShutdown(socket.Shutdown)
 	}
 
 	tr.Call(tr.Update)

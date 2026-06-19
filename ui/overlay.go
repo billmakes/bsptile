@@ -152,6 +152,9 @@ func drawImage(cv *xgraphics.Image, img image.Image, color xgraphics.BGRA, x0 in
 }
 
 func drawText(cv *xgraphics.Image, txt string, color xgraphics.BGRA, x int, y int, size int) {
+	if size < 6 {
+		return
+	}
 	font, err := truetype.Parse(goregular.TTF)
 	if err != nil {
 		log.Error("Parsing font failed: ", err)

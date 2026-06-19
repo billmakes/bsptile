@@ -20,7 +20,8 @@ import (
 )
 
 var (
-	executeCallbacksFun []func(string, uint, uint) // Execute events callback functions
+	executeCallbacksFun  []func(string, uint, uint) // Execute events callback functions
+	shutdownCallbacksFun []func()                   // Shutdown callbacks (called before exit/restart)
 )
 
 func Bind(tr *desktop.Tracker) {
@@ -995,6 +996,9 @@ func Restart(tr *desktop.Tracker) bool {
 	// Communicate application exit
 	Disconnect()
 
+	// Clean up socket and other resources before exec
+	runShutdownCallbacks()
+
 	// Restart application
 	syscall.Exec(common.Process.Path, os.Args, os.Environ())
 
@@ -1016,6 +1020,9 @@ func Exit(tr *desktop.Tracker) bool {
 
 	// Communicate application exit
 	Disconnect()
+
+	// Clean up socket and other resources before exit
+	runShutdownCallbacks()
 
 	// Exit application
 	os.Exit(0)
@@ -1045,6 +1052,16 @@ func External(command string) bool {
 
 func OnExecute(fun func(string, uint, uint)) {
 	executeCallbacksFun = append(executeCallbacksFun, fun)
+}
+
+func OnShutdown(fun func()) {
+	shutdownCallbacksFun = append(shutdownCallbacksFun, fun)
+}
+
+func runShutdownCallbacks() {
+	for _, fun := range shutdownCallbacksFun {
+		fun()
+	}
 }
 
 func executeCallbacks(action string, desktop uint, screen uint) {

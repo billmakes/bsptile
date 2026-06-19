@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"encoding/json"
 	"net/http"
@@ -109,6 +110,8 @@ func InitInfo(name, target, version, commit, date, source, flags string) {
 	}
 }
 
+var httpClient = &http.Client{Timeout: 5 * time.Second}
+
 func FetchReleases(hostname, repository string) []Info {
 	releases := []Info{}
 	if HasFlag("disable-release-info") || IsDevVersion() {
@@ -116,10 +119,11 @@ func FetchReleases(hostname, repository string) []Info {
 	}
 
 	// Request latest release
-	response, err := http.Get(fmt.Sprintf("https://api.%s/repos/%s/releases/latest", hostname, repository))
+	response, err := httpClient.Get(fmt.Sprintf("https://api.%s/repos/%s/releases/latest", hostname, repository))
 	if err != nil {
 		return releases
 	}
+	defer response.Body.Close()
 
 	// Read response body
 	body, err := io.ReadAll(response.Body)
@@ -138,11 +142,18 @@ func FetchReleases(hostname, repository string) []Info {
 	if !IsInMap(data, []string{"id", "html_url", "tag_name", "created_at"}) {
 		return releases
 	}
+	id, ok1 := data["id"].(float64)
+	htmlURL, ok2 := data["html_url"].(string)
+	tagName, ok3 := data["tag_name"].(string)
+	createdAt, ok4 := data["created_at"].(string)
+	if !ok1 || !ok2 || !ok3 || !ok4 || len(tagName) < 2 {
+		return releases
+	}
 	latest := Info{
-		Id:      int(data["id"].(float64)),
-		Url:     data["html_url"].(string),
-		Name:    data["tag_name"].(string)[1:],
-		Created: data["created_at"].(string),
+		Id:      int(id),
+		Url:     htmlURL,
+		Name:    tagName[1:],
+		Created: createdAt,
 		Type:    "releases",
 	}
 
@@ -202,10 +213,11 @@ func FetchIssues(hostname, repository, labels string) []Info {
 	}
 
 	// Request repository issues
-	response, err := http.Get(fmt.Sprintf("https://api.%s/repos/%s/issues?labels=%s", hostname, repository, labels))
+	response, err := httpClient.Get(fmt.Sprintf("https://api.%s/repos/%s/issues?labels=%s", hostname, repository, labels))
 	if err != nil {
 		return issues
 	}
+	defer response.Body.Close()
 
 	// Read response body
 	body, err := io.ReadAll(response.Body)
@@ -225,11 +237,18 @@ func FetchIssues(hostname, repository, labels string) []Info {
 		if !IsInMap(item, []string{"number", "html_url", "title", "created_at"}) {
 			continue
 		}
+		number, ok1 := item["number"].(float64)
+		htmlURL, ok2 := item["html_url"].(string)
+		title, ok3 := item["title"].(string)
+		createdAt, ok4 := item["created_at"].(string)
+		if !ok1 || !ok2 || !ok3 || !ok4 {
+			continue
+		}
 		issues = append(issues, Info{
-			Id:      int(item["number"].(float64)),
-			Url:     item["html_url"].(string),
-			Name:    item["title"].(string),
-			Created: item["created_at"].(string),
+			Id:      int(number),
+			Url:     htmlURL,
+			Name:    title,
+			Created: createdAt,
 			Type:    "issues",
 		})
 	}

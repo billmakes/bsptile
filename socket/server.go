@@ -39,6 +39,17 @@ var topicForEvent = map[string]string{
 	"workspaces_change": proto.TopicWorkspaces,
 }
 
+var activeServer *Server
+
+// Shutdown closes the active control socket, removing the socket file.
+// Safe to call even if the socket was never started.
+func Shutdown() {
+	if activeServer != nil {
+		activeServer.Close()
+		activeServer = nil
+	}
+}
+
 // Init starts the control socket. The path comes from --socket, then
 // $BSPTILE_SOCKET, then the SocketPath default. Returns a server even on
 // failure so callers can still log the error path.
@@ -54,6 +65,7 @@ func Init(tr *desktop.Tracker) (*Server, error) {
 	}
 
 	s := &Server{Tracker: tr, Path: path, listener: l, subs: NewSubscribers()}
+	activeServer = s
 
 	// Fan out tracker events to subscribers.
 	desktop.OnEvent(func(e string) {

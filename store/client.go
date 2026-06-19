@@ -2,7 +2,6 @@ package store
 
 import (
 	"reflect"
-	"regexp"
 	"strings"
 	"time"
 
@@ -25,7 +24,6 @@ type Client struct {
 	Original *Info    `json:"-"` // Original client window information
 	Cached   *Info    `json:"-"` // Cached client window information
 	Latest   *Info    // Latest client window information
-	Locked   bool     // Internal client move/resize lock
 }
 
 type Info struct {
@@ -63,16 +61,7 @@ func CreateClient(w xproto.Window) *Client {
 		Original: GetInfo(w),
 		Cached:   GetInfo(w),
 		Latest:   GetInfo(w),
-		Locked:   false,
 	}
-}
-
-func (c *Client) Lock() {
-	c.Locked = true
-}
-
-func (c *Client) UnLock() {
-	c.Locked = false
 }
 
 func (c *Client) Limit(w, h int) bool {
@@ -178,6 +167,10 @@ func (c *Client) MoveToScreen(screen uint32) bool {
 }
 
 func (c *Client) MoveToScreenDirect(screen uint32) bool {
+	if int(screen) >= len(Workplace.Displays.Screens) {
+		log.Warn("MoveToScreenDirect: screen index out of range [", c.Latest.Class, " screen=", screen, "]")
+		return false
+	}
 	geom := Workplace.Displays.Screens[screen].Geometry
 
 	// Calculate move to position
@@ -203,13 +196,6 @@ func (c *Client) CenterOnScreen() bool {
 }
 
 func (c *Client) MoveWindow(x, y, w, h int) {
-	if c.Locked {
-		log.Info("Reject window move/resize [", c.Latest.Class, "]")
-
-		// Remove lock
-		c.UnLock()
-		return
-	}
 
 	// Remove unwanted properties
 	c.UnMaximize()
@@ -397,37 +383,14 @@ func IsIgnored(info *Info) bool {
 		return true
 	}
 
-	// Check ignored windows
-	for _, s := range common.Config.WindowIgnore {
-		if len(s) != 2 {
-			log.Warn("Skip malformed window_ignore entry")
-			continue
-		}
-		conf_class := s[0]
-		conf_name := s[1]
-
-		reg_class, err := regexp.Compile(strings.ToLower(conf_class))
-		if err != nil {
-			log.Warn("Skip invalid window_ignore class regex: ", err)
-			continue
-		}
-
-		// Ignore all windows with this class
-		class_match := reg_class.MatchString(strings.ToLower(info.Class))
-
-		// But allow the window with a special name
-		name_match := false
-		if conf_name != "" {
-			reg_name, err := regexp.Compile(strings.ToLower(conf_name))
-			if err != nil {
-				log.Warn("Skip invalid window_ignore name regex: ", err)
-				continue
-			}
-			name_match = reg_name.MatchString(strings.ToLower(info.Name))
-		}
-
-		if class_match && !name_match {
-			log.Info("Ignore window with ", strings.TrimSpace(strings.Join(s, " ")), " from config [", info.Class, "]")
+	// Check ignored windows using pre-compiled patterns from config
+	lowerClass := strings.ToLower(info.Class)
+	lowerName := strings.ToLower(info.Name)
+	for _, pat := range common.Config.WindowIgnorePatterns {
+		classMatch := pat.Class.MatchString(lowerClass)
+		nameMatch := pat.Name != nil && pat.Name.MatchString(lowerName)
+		if classMatch && !nameMatch {
+			log.Info("Ignore window [", info.Class, "]")
 			return true
 		}
 	}

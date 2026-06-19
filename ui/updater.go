@@ -165,7 +165,7 @@ func validateChecksum(body []byte, checksums map[string]string, filename string)
 	return nil
 }
 
-func extractFile(body []byte, filename string) (*tar.Reader, error) {
+func extractFile(body []byte, filename string) (io.Reader, error) {
 	gzipReader, err := gzip.NewReader(bytes.NewBuffer(body))
 	if err != nil {
 		return nil, failure(err)
@@ -183,9 +183,13 @@ func extractFile(body []byte, filename string) (*tar.Reader, error) {
 			return nil, failure(err)
 		}
 
-		// Return searched file
+		// Read matching file into memory so gzipReader can be closed safely
 		if header.Name == filename {
-			return tarReader, nil
+			var buf bytes.Buffer
+			if _, err := io.Copy(&buf, tarReader); err != nil {
+				return nil, failure(err)
+			}
+			return &buf, nil
 		}
 	}
 
