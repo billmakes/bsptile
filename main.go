@@ -48,9 +48,6 @@ var (
 var (
 	//go:embed config.toml
 	toml []byte
-
-	//go:embed assets/images/logo.png
-	logo []byte
 )
 
 func main() {
@@ -62,7 +59,7 @@ func main() {
 	common.InitArgs(input.Introspect())
 
 	// Init embedded files
-	common.InitFiles(toml, logo)
+	common.InitFiles(toml)
 
 	// Run dbus instance
 	runDbus()

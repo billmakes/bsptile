@@ -30,8 +30,8 @@ import (
 )
 
 var (
-	logoSize   int = 256 // Size of logo image
-	logoMargin int = 15  // Margin of logo image
+	progressWidth  int = 256 // Progress overlay width
+	progressHeight int = 96  // Progress overlay height
 )
 
 var (
@@ -211,7 +211,7 @@ func applyUpdate(reader io.Reader, filepath string) error {
 func showProgress(ws *desktop.Workspace) {
 
 	// Calculate window dimensions
-	w, h := logoSize+logoMargin*2, logoSize+logoMargin*2
+	w, h := progressWidth, progressHeight
 
 	// Create an empty canvas image
 	bg := bgra("gui_background")
@@ -235,12 +235,8 @@ func updateProgress(txt string) {
 	color := bgra("gui_client_slave")
 	drawImage(cv, &image.Uniform{color}, color, x+rectMargin, y+rectMargin, x+w-rectMargin, y+h-rectMargin)
 
-	// Draw logo onto canvas
-	logo, _, _ := image.Decode(bytes.NewBuffer(common.File.Logo))
-	drawImage(cv, xgraphics.NewConvert(store.X, logo), color, x+rectMargin+logoMargin, y+rectMargin+logoMargin, x+w-rectMargin, y+h-rectMargin)
-
 	// Draw text onto canvas
-	drawText(cv, txt, bgra("gui_text"), cv.Rect.Dx()/2, cv.Rect.Dy()-2*fontMargin-rectMargin-logoMargin/2, fontSize)
+	drawText(cv, txt, bgra("gui_text"), cv.Rect.Dx()/2, cv.Rect.Dy()/2+fontSize/2, fontSize)
 
 	// Update canvas
 	cv.XDraw()

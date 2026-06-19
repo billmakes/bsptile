@@ -214,6 +214,12 @@ Desktop-related actions are split intentionally:
 - `desktop_<n>`, `desktop_next`, `desktop_previous` switch the visible desktop
   without moving the active window.
 
+Window floating actions are runtime overrides for the active window:
+
+- `window_floating` toggles whether bsptile manages the active window.
+- `window_float` releases the active window from the BSP tree.
+- `window_tile` adds the active window back to the BSP tree.
+
 A sample sxhkd file that drives bsptile entirely through `bsptilectl` is at
 [`assets/sxhkdrc.example`](https://github.com/billmakes/bsptile/blob/master/assets/sxhkdrc.example).
 

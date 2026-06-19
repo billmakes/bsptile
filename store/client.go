@@ -482,6 +482,14 @@ func SetAbove(window xproto.Window) bool {
 	return RequestWindowState(window, ewmh.StateAdd, "_NET_WM_STATE_ABOVE")
 }
 
+func UnsetAbove(window xproto.Window) bool {
+	info := GetInfo(window)
+	if !IsAbove(info) {
+		return false
+	}
+	return RequestWindowState(window, ewmh.StateRemove, "_NET_WM_STATE_ABOVE")
+}
+
 func IsSticky(info *Info) bool {
 	return common.IsInList("_NET_WM_STATE_STICKY", info.States)
 }
@@ -583,13 +591,7 @@ func GetInfo(w xproto.Window) *Info {
 	extNet, _ := xprop.PropValNums(xprop.GetProperty(X, w, "_NET_FRAME_EXTENTS"))
 	extGtk, _ := xprop.PropValNums(xprop.GetProperty(X, w, "_GTK_FRAME_EXTENTS"))
 
-	ext := make([]uint, 4)
-	for i, e := range extNet {
-		ext[i] += e
-	}
-	for i, e := range extGtk {
-		ext[i] -= e
-	}
+	ext := FrameExtents(extNet, extGtk)
 
 	// Window dimensions (geometry/extent information for move/resize)
 	dimensions = Dimensions{
@@ -599,10 +601,10 @@ func GetInfo(w xproto.Window) *Info {
 			Motif:  *mhints,
 		},
 		Extents: ewmh.FrameExtents{
-			Left:   int(ext[0]),
-			Right:  int(ext[1]),
-			Top:    int(ext[2]),
-			Bottom: int(ext[3]),
+			Left:   ext.Left,
+			Right:  ext.Right,
+			Top:    ext.Top,
+			Bottom: ext.Bottom,
 		},
 		AdjPos:     (nhints.WinGravity > 1 && !common.AllZero(extNet)) || !common.AllZero(extGtk),
 		AdjSize:    !common.AllZero(extNet) || !common.AllZero(extGtk),
@@ -616,5 +618,31 @@ func GetInfo(w xproto.Window) *Info {
 		States:     states,
 		Location:   location,
 		Dimensions: dimensions,
+	}
+}
+
+func FrameExtents(net, gtk []uint) ewmh.FrameExtents {
+	values := make([]int, 4)
+	for i, e := range net {
+		if i >= len(values) {
+			break
+		}
+		values[i] += int(e)
+	}
+	for i, e := range gtk {
+		if i >= len(values) {
+			break
+		}
+		values[i] -= int(e)
+		if values[i] < 0 {
+			values[i] = 0
+		}
+	}
+
+	return ewmh.FrameExtents{
+		Left:   values[0],
+		Right:  values[1],
+		Top:    values[2],
+		Bottom: values[3],
 	}
 }

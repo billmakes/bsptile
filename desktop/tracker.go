@@ -17,11 +17,13 @@ import (
 )
 
 type Tracker struct {
-	Clients     map[xproto.Window]*store.Client // List of tracked clients
-	Workspaces  map[store.Location]*Workspace   // List of workspaces per location
-	Channels    *Channels                       // Helper for channel communication
-	Handlers    *Handlers                       // Helper for event handlers
-	Initialized bool                            // Initial client restoration is complete
+	Clients              map[xproto.Window]*store.Client // List of tracked clients
+	FloatingWindows      map[xproto.Window]bool          // Runtime per-window floating overrides
+	FloatingAboveWindows map[xproto.Window]bool          // Runtime floating windows bsptile raised above tiled windows
+	Workspaces           map[store.Location]*Workspace   // List of workspaces per location
+	Channels             *Channels                       // Helper for channel communication
+	Handlers             *Handlers                       // Helper for event handlers
+	Initialized          bool                            // Initial client restoration is complete
 
 	// muteUntil suppresses drag-detection from the move/swap handler while
 	// layout-driven ConfigureNotify events are still settling. Without this,
@@ -92,8 +94,10 @@ func (h *Handler) Reset() {
 
 func CreateTracker() *Tracker {
 	tr := Tracker{
-		Clients:    make(map[xproto.Window]*store.Client),
-		Workspaces: CreateWorkspaces(),
+		Clients:              make(map[xproto.Window]*store.Client),
+		FloatingWindows:      make(map[xproto.Window]bool),
+		FloatingAboveWindows: make(map[xproto.Window]bool),
+		Workspaces:           CreateWorkspaces(),
 		Channels: &Channels{
 			Action: make(chan string, 64),
 		},
@@ -193,6 +197,9 @@ func (tr *Tracker) Update() {
 			case rule.Tile:
 				trackable[w.Id] = !store.IsSpecial(info)
 			}
+		}
+		if tr.IsWindowFloating(w.Id) {
+			trackable[w.Id] = false
 		}
 		if !workspaceEnabled {
 			trackable[w.Id] = false
@@ -368,6 +375,50 @@ func (tr *Tracker) ClientForWindow(window store.XWindow) *store.Client {
 		return nil
 	}
 	return tr.Clients[window.Id]
+}
+
+func (tr *Tracker) IsWindowFloating(w xproto.Window) bool {
+	return tr != nil && tr.FloatingWindows != nil && tr.FloatingWindows[w]
+}
+
+func (tr *Tracker) SetWindowFloating(w xproto.Window, floating bool) bool {
+	if tr == nil || w == 0 {
+		return false
+	}
+	if tr.FloatingWindows == nil {
+		tr.FloatingWindows = make(map[xproto.Window]bool)
+	}
+	if tr.FloatingAboveWindows == nil {
+		tr.FloatingAboveWindows = make(map[xproto.Window]bool)
+	}
+	if floating {
+		if tr.FloatingWindows[w] {
+			return false
+		}
+		if !store.IsAbove(store.GetInfo(w)) && store.SetAbove(w) {
+			tr.FloatingAboveWindows[w] = true
+		}
+		tr.FloatingWindows[w] = true
+		tr.Update()
+		return true
+	}
+	if !tr.FloatingWindows[w] {
+		return false
+	}
+	delete(tr.FloatingWindows, w)
+	if tr.FloatingAboveWindows[w] {
+		store.UnsetAbove(w)
+		delete(tr.FloatingAboveWindows, w)
+	}
+	tr.Update()
+	if c := tr.Clients[w]; c != nil {
+		tr.Tile(tr.ClientWorkspace(c))
+	}
+	return true
+}
+
+func (tr *Tracker) ToggleWindowFloating(w xproto.Window) bool {
+	return tr.SetWindowFloating(w, !tr.IsWindowFloating(w))
 }
 
 func (tr *Tracker) unlockClients() {
@@ -842,6 +893,9 @@ func (tr *Tracker) attachHandlers(c *store.Client) {
 	xevent.ConfigureNotifyFun(func(X *xgbutil.XUtil, ev xevent.ConfigureNotifyEvent) {
 		tr.Post(func() {
 			log.Trace("Client structure event [", c.Latest.Class, "]")
+			if tr.handlersMuted() {
+				return
+			}
 
 			// Handle structure events
 			tr.handleResizeClient(c)
@@ -864,6 +918,15 @@ func (tr *Tracker) attachHandlers(c *store.Client) {
 				tr.handleMinimizedClient(c)
 			} else if aname == "_NET_WM_DESKTOP" {
 				tr.handleWorkspaceChange(&Handler{Source: c, Target: tr.ActiveWorkspace()})
+			} else if aname == "_NET_FRAME_EXTENTS" {
+				ws := tr.ClientWorkspace(c)
+				if ws != nil && ws.TilingEnabled() && tr.isTracked(c.Window.Id) {
+					old := c.Latest.Dimensions.Extents
+					c.Update()
+					if c.Latest.Dimensions.Extents != old {
+						tr.Tile(ws)
+					}
+				}
 			}
 		})
 	}).Connect(store.X, c.Window.Id)

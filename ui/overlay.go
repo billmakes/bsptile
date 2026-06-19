@@ -226,7 +226,11 @@ func showGraphics(img *xgraphics.Image, ws *desktop.Workspace, duration time.Dur
 	})
 
 	// Paint the image and map the window
-	img.XSurfaceSet(win.Id)
+	if err := img.XSurfaceSet(win.Id); err != nil {
+		log.Warn("showGraphics: surface set failed: ", err)
+		win.Destroy()
+		return nil
+	}
 	img.XDraw()
 	img.XPaint(win.Id)
 	win.Map()

@@ -139,7 +139,11 @@ func createIndicatorWindow(x, y, w, h int, color xgraphics.BGRA, opacity float64
 
 	img := xgraphics.New(win.X, image.Rect(0, 0, w, h))
 	img.For(func(_, _ int) xgraphics.BGRA { return color })
-	img.XSurfaceSet(win.Id)
+	if err := img.XSurfaceSet(win.Id); err != nil {
+		log.Warn("Drop indicator surface set failed: ", err)
+		win.Destroy()
+		return nil
+	}
 	img.XDraw()
 	img.XPaint(win.Id)
 	win.Map()

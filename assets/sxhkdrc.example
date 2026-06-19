@@ -81,6 +81,9 @@ ctrl + shift + BackSpace
 super + q
     bsptilectl action close
 
+super + shift + space
+    bsptilectl action window_floating
+
 ctrl + shift + b
     bsptilectl action balance
 

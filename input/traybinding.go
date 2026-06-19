@@ -57,13 +57,12 @@ func BindTray(tr *desktop.Tracker) {
 func items(tr *desktop.Tracker) {
 	systray.SetTooltip(fmt.Sprintf("%s - tiling manager", common.Build.Name))
 	systray.SetTitle(common.Build.Name)
+	systray.SetIcon(ui.GenericIcon())
 
 	// Version text
 	title := fmt.Sprintf("%s v%s", common.Build.Name, common.Build.Version)
 	version := systray.AddMenuItem(title, title)
 
-	// Version icon
-	version.SetIcon(common.File.Logo)
 	if !common.HasReleaseInfos() && !common.HasIssueInfos() {
 		version.Disable()
 	}

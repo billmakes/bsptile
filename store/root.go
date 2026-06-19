@@ -384,8 +384,24 @@ func DisplaysGet(X *xgbutil.XUtil) XDisplays {
 	}
 
 	// Update desktop geometry
+	var workarea *common.Geometry
+	if workareas, err := ewmh.WorkareaGet(X); err == nil {
+		if desktop := CurrentDesktopGet(X); int(desktop) < len(workareas) {
+			area := workareas[desktop]
+			workarea = &common.Geometry{
+				X:      area.X,
+				Y:      area.Y,
+				Width:  int(area.Width),
+				Height: int(area.Height),
+			}
+		}
+	}
 	for i := range desktops {
-		desktops[i].Geometry = *common.CreateGeometry(rects[i])
+		desktop := clampDesktopToScreen(*common.CreateGeometry(rects[i]), screens[i].Geometry)
+		if workarea != nil {
+			desktop = clampDesktopToScreen(*workarea, desktop)
+		}
+		desktops[i].Geometry = desktop
 	}
 
 	// Create display heads
@@ -400,6 +416,31 @@ func DisplaysGet(X *xgbutil.XUtil) XDisplays {
 	log.Info("Desktops ", heads.Desktops)
 
 	return heads
+}
+
+func clampDesktopToScreen(desktop common.Geometry, screen common.Geometry) common.Geometry {
+	if screen.Width <= 0 || screen.Height <= 0 {
+		return desktop
+	}
+	if desktop.Width <= 0 || desktop.Height <= 0 {
+		return screen
+	}
+
+	left := common.MaxInt(desktop.X, screen.X)
+	top := common.MaxInt(desktop.Y, screen.Y)
+	right := common.MinInt(desktop.X+desktop.Width, screen.X+screen.Width)
+	bottom := common.MinInt(desktop.Y+desktop.Height, screen.Y+screen.Height)
+
+	if right <= left || bottom <= top {
+		return screen
+	}
+
+	return common.Geometry{
+		X:      left,
+		Y:      top,
+		Width:  right - left,
+		Height: bottom - top,
+	}
 }
 
 func PhysicalHeadsGet(X *xgbutil.XUtil) []XHead {

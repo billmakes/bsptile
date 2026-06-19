@@ -247,6 +247,30 @@ func CloseWindow(tr *desktop.Tracker, ws *desktop.Workspace) bool {
 	return store.CloseXWindow(w.Id)
 }
 
+func EnableWindowFloating(tr *desktop.Tracker, ws *desktop.Workspace) bool {
+	w := activeActionWindow(tr)
+	if w == nil || w.Id == 0 {
+		return false
+	}
+	return tr.SetWindowFloating(w.Id, true)
+}
+
+func DisableWindowFloating(tr *desktop.Tracker, ws *desktop.Workspace) bool {
+	w := activeActionWindow(tr)
+	if w == nil || w.Id == 0 {
+		return false
+	}
+	return tr.SetWindowFloating(w.Id, false)
+}
+
+func ToggleWindowFloating(tr *desktop.Tracker, ws *desktop.Workspace) bool {
+	w := activeActionWindow(tr)
+	if w == nil || w.Id == 0 {
+		return false
+	}
+	return tr.ToggleWindowFloating(w.Id)
+}
+
 func activeActionWindow(tr *desktop.Tracker) *store.XWindow {
 	if store.X != nil {
 		active := store.ActiveWindowGet(store.X)

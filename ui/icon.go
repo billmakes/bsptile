@@ -106,6 +106,29 @@ func HintIcon(active bool) []byte {
 	return data.Bytes()
 }
 
+func GenericIcon() []byte {
+	icon := image.NewRGBA(image.Rect(0, 0, iconSize, iconSize))
+	bg := image.Uniform{color.RGBA{R: 46, G: 52, B: 64, A: 255}}
+	fg := image.Uniform{color.RGBA{R: 236, G: 239, B: 244, A: 255}}
+	accent := image.Uniform{color.RGBA{R: 136, G: 192, B: 208, A: 255}}
+
+	draw.Draw(icon, icon.Bounds(), &bg, image.Point{}, draw.Src)
+	margin := iconSize / 5
+	gap := iconSize / 18
+	x0, y0 := margin, margin
+	x1, y1 := iconSize-margin, iconSize-margin
+	mid := x0 + (x1-x0)/2
+
+	draw.Draw(icon, image.Rect(x0, y0, mid-gap, y1), &fg, image.Point{}, draw.Src)
+	draw.Draw(icon, image.Rect(mid+gap, y0, x1, y0+(y1-y0)/2-gap), &fg, image.Point{}, draw.Src)
+	draw.Draw(icon, image.Rect(mid+gap, y0+(y1-y0)/2+gap, x1, y1), &accent, image.Point{}, draw.Src)
+
+	data := new(bytes.Buffer)
+	png.Encode(data, icon)
+
+	return data.Bytes()
+}
+
 func EmptyIcon() []byte {
 	icon := image.NewRGBA(image.Rect(0, 0, iconSize, iconSize))
 
