@@ -118,11 +118,7 @@ func runMain() {
 
 	// Create tracker instance
 	tr := desktop.CreateTracker()
-
-	// Start tracker event dispatcher before any senders. Bind() and the
-	// mouse poll loop can publish events as soon as they start, and the
-	// channel is unbuffered, so we need a drain in place first.
-	go tr.DispatchEvents()
+	store.SetStateDispatcher(tr.Post)
 
 	input.Bind(tr)
 
@@ -133,13 +129,15 @@ func runMain() {
 		}
 	}
 
-	tr.Update()
+	tr.Call(tr.Update)
 
 	// Show layout overlay
-	ws := tr.ActiveWorkspace()
-	if ws.TilingEnabled() {
-		ui.ShowLayout(ws)
-	}
+	tr.Call(func() {
+		ws := tr.ActiveWorkspace()
+		if ws.TilingEnabled() {
+			ui.ShowLayout(ws)
+		}
+	})
 
 	// Run X event loop
 	xevent.Main(store.X)
@@ -185,8 +183,7 @@ func InitLog() *os.File {
 func createLockFile(filename string) (*os.File, error) {
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
-		fmt.Println(fmt.Errorf("FILE error (%s)", err))
-		return nil, nil
+		return nil, fmt.Errorf("open lock file: %w", err)
 	}
 
 	err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)

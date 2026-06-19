@@ -12,7 +12,7 @@ LDFLAGS = -s -w \
 	-X main.commit=$(COMMIT) \
 	-X main.date=$(DATE)
 
-.PHONY: build build-daemon build-ctl install clean
+.PHONY: build build-daemon build-ctl install test test-integration clean
 
 build: build-daemon build-ctl
 
@@ -27,6 +27,12 @@ PREFIX  = $(HOME)/.local
 install: build
 	install -Dm755 $(BINARY) $(PREFIX)/bin/$(BINARY)
 	install -Dm755 $(CTL) $(PREFIX)/bin/$(CTL)
+
+test:
+	go test ./...
+
+test-integration: build
+	./scripts/test-x11-integration.sh
 
 clean:
 	rm -f $(BINARY) $(CTL)

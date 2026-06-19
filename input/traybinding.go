@@ -89,7 +89,9 @@ func items(tr *desktop.Tracker) {
 					// Update cache and ui icons
 					if info.Seen() {
 						subitem.SetIcon(ui.HintIcon(false))
-						ui.UpdateIcon(tr.ActiveWorkspace())
+						tr.Post(func() {
+							ui.UpdateIcon(tr.ActiveWorkspace())
+						})
 					}
 				}
 			}(issue)
@@ -123,7 +125,9 @@ func items(tr *desktop.Tracker) {
 					// Update cache and ui icons
 					if info.Seen() {
 						subitem.SetIcon(ui.HintIcon(false))
-						ui.UpdateIcon(tr.ActiveWorkspace())
+						tr.Post(func() {
+							ui.UpdateIcon(tr.ActiveWorkspace())
+						})
 					}
 				}
 			}(release)
@@ -168,9 +172,12 @@ func items(tr *desktop.Tracker) {
 					<-subitem.ClickedCh
 
 					// Update running binary
-					ws := tr.ActiveWorkspace()
+					var ws *desktop.Workspace
+					tr.Call(func() {
+						ws = tr.ActiveWorkspace()
+					})
 					ui.UpdateBinary(ws, info, func() {
-						Restart(tr)
+						ExecuteActiveAction("restart", tr)
 					})
 				}
 			}(*release.Extra)
@@ -211,7 +218,7 @@ func items(tr *desktop.Tracker) {
 		go func(action string) {
 			for {
 				<-item.ClickedCh
-				ExecuteAction(action, tr, tr.ActiveWorkspace())
+				ExecuteActiveAction(action, tr)
 			}
 		}(action)
 	}
@@ -276,10 +283,16 @@ func onExecute(tr *desktop.Tracker, action string) {
 	if !common.IsInList(action, []string{"enable", "disable", "toggle", "decoration", "restore", "reset"}) {
 		return
 	}
-	onActivate(tr)
+	updateTrayState(tr)
 }
 
 func onActivate(tr *desktop.Tracker) {
+	tr.Post(func() {
+		updateTrayState(tr)
+	})
+}
+
+func updateTrayState(tr *desktop.Tracker) {
 	ws := tr.ActiveWorkspace()
 	al := ws.ActiveLayout()
 	mg := al.GetManager()
@@ -342,13 +355,13 @@ func onPointerClick(tr *desktop.Tracker, pointer store.XPointer) {
 	// Wait for dbus events
 	click = time.AfterFunc(150*time.Millisecond, func() {
 		if clicked && button.Left {
-			ExecuteAction(common.Config.Systray["click_left"], tr, tr.ActiveWorkspace())
+			ExecuteActiveAction(common.Config.Systray["click_left"], tr)
 		}
 		if clicked && button.Middle {
-			ExecuteAction(common.Config.Systray["click_middle"], tr, tr.ActiveWorkspace())
+			ExecuteActiveAction(common.Config.Systray["click_middle"], tr)
 		}
 		if clicked && button.Right {
-			ExecuteAction(common.Config.Systray["click_right"], tr, tr.ActiveWorkspace())
+			ExecuteActiveAction(common.Config.Systray["click_right"], tr)
 		}
 		clicked = false
 	})
@@ -366,15 +379,15 @@ func onPointerScroll(tr *desktop.Tracker, delta int32, orientation string) {
 		switch orientation {
 		case "vertical":
 			if delta >= 0 {
-				ExecuteAction(common.Config.Systray["scroll_down"], tr, tr.ActiveWorkspace())
+				ExecuteActiveAction(common.Config.Systray["scroll_down"], tr)
 			} else {
-				ExecuteAction(common.Config.Systray["scroll_up"], tr, tr.ActiveWorkspace())
+				ExecuteActiveAction(common.Config.Systray["scroll_up"], tr)
 			}
 		case "horizontal":
 			if delta >= 0 {
-				ExecuteAction(common.Config.Systray["scroll_right"], tr, tr.ActiveWorkspace())
+				ExecuteActiveAction(common.Config.Systray["scroll_right"], tr)
 			} else {
-				ExecuteAction(common.Config.Systray["scroll_left"], tr, tr.ActiveWorkspace())
+				ExecuteActiveAction(common.Config.Systray["scroll_left"], tr)
 			}
 		}
 	})

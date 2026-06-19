@@ -130,6 +130,6 @@ func bind(key string, action string, mod string, tr *desktop.Tracker) {
 
 func action(ch chan string, tr *desktop.Tracker) {
 	for {
-		ExecuteAction(<-ch, tr, tr.ActiveWorkspace())
+		ExecuteActiveAction(<-ch, tr)
 	}
 }

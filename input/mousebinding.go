@@ -31,19 +31,21 @@ func BindMouse(tr *desktop.Tracker) {
 	ReloadMouseBindings(tr)
 
 	poll(100, func() {
-		store.PointerUpdate(store.X)
+		tr.Post(func() {
+			store.PointerUpdate(store.X)
 
-		// Reset tracker handler
-		resetTracker(tr)
+			// Reset tracker handler
+			resetTracker(tr)
 
-		// Evaluate workspace state
-		updateWorkspace(tr)
+			// Evaluate workspace state
+			updateWorkspace(tr)
 
-		// Evaluate focus state
-		updateFocus(tr)
+			// Evaluate focus state
+			updateFocus(tr)
 
-		// Store last pointer
-		pointer = store.Pointer
+			// Store last pointer
+			pointer = store.Pointer
+		})
 	})
 }
 
@@ -102,7 +104,7 @@ func updateWorkspace(tr *desktop.Tracker) {
 	log.Info("Active workspace updated [", ws.Name, "]")
 
 	// Communicate workplace change
-	tr.Channels.Event <- "workplace_change"
+	tr.EmitEvent("workplace_change")
 
 	// Update systray icon
 	ui.UpdateIcon(ws)
@@ -195,7 +197,9 @@ func cancelHoverFocus() {
 
 func poll(t time.Duration, fun func()) {
 	go func() {
-		for range time.Tick(t * time.Millisecond) {
+		ticker := time.NewTicker(t * time.Millisecond)
+		defer ticker.Stop()
+		for range ticker.C {
 			fun()
 		}
 	}()

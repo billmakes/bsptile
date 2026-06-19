@@ -157,3 +157,58 @@ func TestValidateConfigRequiresModeDefault(t *testing.T) {
 		t.Fatalf("expected valid mode: %v", err)
 	}
 }
+
+func TestValidateConfigRejectsMalformedWindowIgnore(t *testing.T) {
+	tests := []Configuration{
+		{WindowIgnore: [][]string{{"only-class"}}},
+		{WindowIgnore: [][]string{{"[", ""}}},
+		{WindowIgnore: [][]string{{"valid", "["}}},
+	}
+	for _, config := range tests {
+		if err := validateConfig(config); err == nil {
+			t.Fatalf("expected invalid window_ignore to be rejected: %#v", config.WindowIgnore)
+		}
+	}
+}
+
+func TestValidateConfigRejectsInvalidRules(t *testing.T) {
+	zero := 0
+	one := 1
+	tests := []Configuration{
+		{WindowRules: []WindowRule{{}}},
+		{WindowRules: []WindowRule{{Class: "["}}},
+		{WindowRules: []WindowRule{{Class: "x", Name: "["}}},
+		{WindowRules: []WindowRule{{Class: "x", Tile: true, Floating: true}}},
+		{WindowRules: []WindowRule{{Class: "x", Monitor: &zero}}},
+		{WindowRules: []WindowRule{{Class: "x", Sticky: true, Desktop: &one}}},
+		{WorkspaceRules: []WorkspaceRule{{Desktop: 0}}},
+		{WorkspaceRules: []WorkspaceRule{{Desktop: 1, Screen: &zero}}},
+		{WorkspaceRules: []WorkspaceRule{{Desktop: 1, Layout: "unknown"}}},
+	}
+	for _, config := range tests {
+		if err := validateConfig(config); err == nil {
+			t.Fatalf("expected invalid rule configuration to be rejected: %#v", config)
+		}
+	}
+}
+
+func TestNotifyConfigChangeInvokesRegisteredCallbacks(t *testing.T) {
+	configChangeMu.Lock()
+	previous := configChangeCallbacks
+	configChangeCallbacks = nil
+	configChangeMu.Unlock()
+	t.Cleanup(func() {
+		configChangeMu.Lock()
+		configChangeCallbacks = previous
+		configChangeMu.Unlock()
+	})
+
+	called := false
+	OnConfigChange(func() {
+		called = true
+	})
+	notifyConfigChange()
+	if !called {
+		t.Fatal("config-change callback was not invoked")
+	}
+}

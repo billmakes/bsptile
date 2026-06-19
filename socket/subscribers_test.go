@@ -68,12 +68,17 @@ func TestSubscribersDropsBrokenConnections(t *testing.T) {
 	// Publish should detect the dead conn and remove the subscriber.
 	subs.Publish(proto.TopicAction, "payload")
 
-	subs.mu.Lock()
-	_, present := subs.conns[server]
-	subs.mu.Unlock()
-	if present {
-		t.Fatal("broken subscriber was not removed")
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		subs.mu.Lock()
+		_, present := subs.conns[server]
+		subs.mu.Unlock()
+		if !present {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
+	t.Fatal("broken subscriber was not removed")
 }
 
 func TestSubscribersRemove(t *testing.T) {
@@ -90,6 +95,33 @@ func TestSubscribersRemove(t *testing.T) {
 	subs.mu.Unlock()
 	if present {
 		t.Fatal("subscriber should have been removed")
+	}
+}
+
+func TestSubscribersDropsSlowConnectionWithoutBlockingOthers(t *testing.T) {
+	subs := NewSubscribers()
+	slowClient, slowServer := net.Pipe()
+	fastClient, fastServer := net.Pipe()
+	defer slowClient.Close()
+	defer fastClient.Close()
+	defer fastServer.Close()
+
+	subs.Add(slowServer, []string{proto.TopicAction})
+	subs.Add(fastServer, []string{proto.TopicAction})
+
+	done := make(chan struct{})
+	go func() {
+		subs.Publish(proto.TopicAction, "payload")
+		close(done)
+	}()
+
+	if _, err := readLine(fastClient); err != nil {
+		t.Fatalf("fast subscriber read failed: %v", err)
+	}
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("slow subscriber blocked publication")
 	}
 }
 

@@ -82,6 +82,12 @@ func InitArgs(introspect map[string][]string) {
 							fmt.Fprintf(dbus.Output(), "  %s dbus -property %s\n", Build.Name, property)
 						}
 					}
+					if actions, ok := introspect["Actions"]; ok {
+						fmt.Fprintf(dbus.Output(), "\nActions:\n")
+						for _, action := range actions {
+							fmt.Fprintf(dbus.Output(), "  %s\n", action)
+						}
+					}
 				} else {
 					fmt.Fprintf(dbus.Output(), "\n>>> start %s to see further information's <<<\n", Build.Name)
 				}

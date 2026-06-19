@@ -31,14 +31,14 @@ func (l *FullscreenLayout) Apply() {
 	clients := l.Clients(store.Ordered)
 	active := l.ActiveClient()
 
-	_, _, dw, dh := store.ScreenGeometry(l.Location.Screen).Pieces()
+	target := FullscreenGeometry(*store.ScreenGeometry(l.Location.Screen))
 
 	log.Info("Tile ", len(clients), " windows with ", l.Name, " layout [workspace-", l.Location.Desktop, "-", l.Location.Screen, "]")
 
 	for _, c := range clients {
 		if active != nil && c.Window.Id == active.Window.Id {
-			minw := int(math.Round(float64(dw)))
-			minh := int(math.Round(float64(dh)))
+			minw := int(math.Round(float64(target.Width)))
+			minh := int(math.Round(float64(target.Height)))
 			c.Limit(minw, minh)
 			c.Fullscreen()
 			c.Update()
@@ -47,6 +47,10 @@ func (l *FullscreenLayout) Apply() {
 			c.UnFullscreen()
 		}
 	}
+}
+
+func FullscreenGeometry(screen common.Geometry) common.Geometry {
+	return screen
 }
 
 func (l *FullscreenLayout) UpdateProportions(c *store.Client, d *store.Directions, geom common.Geometry) {

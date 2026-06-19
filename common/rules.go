@@ -15,10 +15,10 @@ func MatchWindowRule(class, name string) *WindowRule {
 		if r.Class == "" {
 			continue
 		}
-		if !matchRegex(r.Class, class) {
+		if !matchRuleRegex(r.classPattern, r.Class, class) {
 			continue
 		}
-		if r.Name != "" && !matchRegex(r.Name, name) {
+		if r.Name != "" && !matchRuleRegex(r.namePattern, r.Name, name) {
 			continue
 		}
 		return r
@@ -44,6 +44,13 @@ func MatchWorkspaceRule(desktop, screen uint) *WorkspaceRule {
 		return r
 	}
 	return nil
+}
+
+func matchRuleRegex(compiled *regexp.Regexp, pattern, value string) bool {
+	if compiled != nil {
+		return compiled.MatchString(value)
+	}
+	return matchRegex(pattern, value)
 }
 
 func matchRegex(pattern, value string) bool {

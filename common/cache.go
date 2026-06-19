@@ -26,7 +26,9 @@ func InitCache() {
 	// Create cache folder if not exists
 	cacheFolderPath := Args.Cache
 	if _, err := os.Stat(cacheFolderPath); os.IsNotExist(err) {
-		os.MkdirAll(cacheFolderPath, 0755)
+		if err := os.MkdirAll(cacheFolderPath, 0755); err != nil {
+			log.Error("Error creating cache folder: ", err)
+		}
 	}
 }
 

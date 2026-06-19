@@ -14,7 +14,6 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/jezek/xgb/xproto"
-	"github.com/jezek/xgbutil/ewmh"
 
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
@@ -43,10 +42,7 @@ func (m Methods) ActionExecute(name string, desktop int32, screen int32) (string
 	success := false
 
 	// Execute action
-	ws := m.Tracker.WorkspaceAt(uint(desktop), uint(screen))
-	if ws != nil {
-		success = ExecuteAction(name, m.Tracker, ws)
-	}
+	success = ExecuteActionAt(name, m.Tracker, uint(desktop), uint(screen))
 
 	// Return result
 	result := common.Map{"Success": success}
@@ -57,11 +53,12 @@ func (m Methods) ActionExecute(name string, desktop int32, screen int32) (string
 func (m Methods) WindowActivate(id int32) (string, *dbus.Error) {
 	success := false
 
-	// Activate window
-	if c, ok := m.Tracker.Clients[xproto.Window(id)]; ok {
-		store.ActiveWindowSet(store.X, c.Window)
-		success = true
-	}
+	m.Tracker.Call(func() {
+		if c, ok := m.Tracker.Clients[xproto.Window(id)]; ok {
+			store.ActiveWindowSet(store.X, c.Window)
+			success = true
+		}
+	})
 
 	// Return result
 	result := common.Map{"Success": success}
@@ -72,13 +69,15 @@ func (m Methods) WindowActivate(id int32) (string, *dbus.Error) {
 func (m Methods) WindowToPosition(id int32, x int32, y int32) (string, *dbus.Error) {
 	success := false
 
-	// Move window to position
-	valid := x >= 0 && y >= 0
-	if c, ok := m.Tracker.Clients[xproto.Window(id)]; ok && valid {
-		ewmh.MoveWindow(store.X, c.Window.Id, int(x), int(y))
-		store.Pointer.Press()
-		success = true
-	}
+	m.Tracker.Call(func() {
+		valid := x >= 0 && y >= 0
+		if c, ok := m.Tracker.Clients[xproto.Window(id)]; ok && valid {
+			success = store.MoveXWindow(c.Window.Id, int(x), int(y))
+			if success {
+				store.Pointer.Press()
+			}
+		}
+	})
 
 	// Return result
 	result := common.Map{"Success": success}
@@ -89,11 +88,12 @@ func (m Methods) WindowToPosition(id int32, x int32, y int32) (string, *dbus.Err
 func (m Methods) WindowToDesktop(id int32, desktop int32) (string, *dbus.Error) {
 	success := false
 
-	// Move window to desktop
-	valid := desktop >= 0 && uint(desktop) < store.Workplace.DesktopCount
-	if c, ok := m.Tracker.Clients[xproto.Window(id)]; ok && valid {
-		success = c.MoveToDesktop(uint32(desktop))
-	}
+	m.Tracker.Call(func() {
+		valid := desktop >= 0 && uint(desktop) < store.Workplace.DesktopCount
+		if c, ok := m.Tracker.Clients[xproto.Window(id)]; ok && valid {
+			success = c.MoveToDesktop(uint32(desktop))
+		}
+	})
 
 	// Return result
 	result := common.Map{"Success": success}
@@ -104,11 +104,12 @@ func (m Methods) WindowToDesktop(id int32, desktop int32) (string, *dbus.Error) 
 func (m Methods) WindowToScreen(id int32, screen int32) (string, *dbus.Error) {
 	success := false
 
-	// Move window to screen
-	valid := screen >= 0 && uint(screen) < store.Workplace.ScreenCount
-	if c, ok := m.Tracker.Clients[xproto.Window(id)]; ok && valid {
-		success = c.MoveToScreen(uint32(screen))
-	}
+	m.Tracker.Call(func() {
+		valid := screen >= 0 && uint(screen) < store.Workplace.ScreenCount
+		if c, ok := m.Tracker.Clients[xproto.Window(id)]; ok && valid {
+			success = c.MoveToScreen(uint32(screen))
+		}
+	})
 
 	// Return result
 	result := common.Map{"Success": success}
@@ -119,12 +120,13 @@ func (m Methods) WindowToScreen(id int32, screen int32) (string, *dbus.Error) {
 func (m Methods) DesktopSwitch(desktop int32) (string, *dbus.Error) {
 	success := false
 
-	// Switch current desktop
-	valid := desktop >= 0 && uint(desktop) < store.Workplace.DesktopCount
-	if valid {
-		store.CurrentDesktopSet(store.X, uint(desktop))
-		success = true
-	}
+	m.Tracker.Call(func() {
+		valid := desktop >= 0 && uint(desktop) < store.Workplace.DesktopCount
+		if valid {
+			store.CurrentDesktopSet(store.X, uint(desktop))
+			success = true
+		}
+	})
 
 	// Return result
 	result := common.Map{"Success": success}
@@ -315,16 +317,17 @@ func export(tr *desktop.Tracker) {
 }
 
 func Introspect() map[string][]string {
+	result := map[string][]string{"Actions": ActionNames()}
 	conn, err := connect()
 	if err != nil {
-		return map[string][]string{}
+		return result
 	}
 	defer conn.Close()
 
 	// Call introspect method
 	node, err := introspect.Call(conn.Object(iface, opath))
 	if err != nil {
-		return map[string][]string{}
+		return result
 	}
 
 	// Iterate node interfaces
@@ -360,10 +363,9 @@ func Introspect() map[string][]string {
 	sort.Strings(methods)
 	sort.Strings(properties)
 
-	return map[string][]string{
-		"Methods":    methods,
-		"Properties": properties,
-	}
+	result["Methods"] = methods
+	result["Properties"] = properties
+	return result
 }
 
 func Method(name string, args []string) {

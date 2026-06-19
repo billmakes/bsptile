@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -50,6 +51,17 @@ func TestServerHandleRejectsInvalidJSON(t *testing.T) {
 	}
 	if !strings.Contains(resp.Error, "invalid request") {
 		t.Fatalf("error = %q, want invalid-request message", resp.Error)
+	}
+}
+
+func TestValidActionModifier(t *testing.T) {
+	for _, modifier := range []string{"current", "screens", "workspaces"} {
+		if !validActionModifier(modifier) {
+			t.Fatalf("valid modifier %q was rejected", modifier)
+		}
+	}
+	if validActionModifier("bogus") {
+		t.Fatal("invalid modifier was accepted")
 	}
 }
 
@@ -100,6 +112,51 @@ func TestServerSubscribeAcksThenStreamsEvents(t *testing.T) {
 	}
 	if ev.Event != proto.TopicAction {
 		t.Fatalf("event = %q, want %q", ev.Event, proto.TopicAction)
+	}
+}
+
+func TestRemoveStaleSocketRejectsRegularFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bsptile.sock")
+	if err := os.WriteFile(path, []byte("do not delete"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := removeStaleSocket(path); err == nil {
+		t.Fatal("expected regular file at socket path to be rejected")
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("regular file was removed: %v", err)
+	}
+}
+
+func TestRemoveStaleSocketRemovesOwnedSocket(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bsptile.sock")
+	listener, err := net.Listen("unix", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener.Close()
+
+	if err := removeStaleSocket(path); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(path); !os.IsNotExist(err) {
+		t.Fatalf("stale socket still exists: %v", err)
+	}
+}
+
+func TestSocketPermissionsArePrivate(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bsptile.sock")
+	listener, err := listenControlSocket(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0600 {
+		t.Fatalf("socket mode = %o, want 600", got)
 	}
 }
 

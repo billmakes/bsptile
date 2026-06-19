@@ -104,6 +104,24 @@ func TestBSPRemoveCollapsesParent(t *testing.T) {
 	}
 }
 
+func TestBSPInsertInvalidRequestPreservesSource(t *testing.T) {
+	mg := CreateBSPManager(Location{})
+	first := testClient(1)
+	second := testClient(2)
+	mg.AddClient(first)
+	Windows = &XWindows{Active: *first.Window}
+	mg.AddClient(second)
+
+	mg.InsertClient(second, first, "invalid")
+
+	if mg.node(first) == nil || mg.node(second) == nil {
+		t.Fatal("invalid insert removed an existing client")
+	}
+	if len(mg.Clients(Stacked)) != 2 {
+		t.Fatalf("client count = %d, want 2", len(mg.Clients(Stacked)))
+	}
+}
+
 func TestBSPSwapKeepsTreeShape(t *testing.T) {
 	mg := CreateBSPManager(Location{})
 	first := testClient(1)

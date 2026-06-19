@@ -3,6 +3,9 @@ package common
 import (
 	"fmt"
 	"os"
+	"regexp"
+	"sync"
+	"time"
 
 	"encoding/json"
 	"path/filepath"
@@ -16,6 +19,9 @@ import (
 
 var (
 	Config Configuration // Decoded config values
+
+	configChangeMu        sync.Mutex
+	configChangeCallbacks []func()
 )
 
 type Configuration struct {
@@ -58,6 +64,9 @@ type WindowRule struct {
 	Tile     bool   `toml:"tile,omitempty"`     // true → force-tile even when IsFloating() would say no
 	Monitor  *int   `toml:"monitor,omitempty"`  // optional: send to this monitor (1-indexed)
 	Desktop  *int   `toml:"desktop,omitempty"`  // optional: send to this desktop (1-indexed)
+
+	classPattern *regexp.Regexp
+	namePattern  *regexp.Regexp
 }
 
 // WorkspaceRule sets the initial state of one (or every) workspace on a given
@@ -102,12 +111,16 @@ func InitConfig() {
 	// Create config folder if not exists
 	configFolderPath := filepath.Dir(Args.Config)
 	if _, err := os.Stat(configFolderPath); os.IsNotExist(err) {
-		os.MkdirAll(configFolderPath, 0755)
+		if err := os.MkdirAll(configFolderPath, 0755); err != nil {
+			log.Fatal("Error creating config folder: ", err)
+		}
 	}
 
 	// Write default config if not exists
 	if _, err := os.Stat(Args.Config); os.IsNotExist(err) {
-		os.WriteFile(Args.Config, File.Toml, 0644)
+		if err := os.WriteFile(Args.Config, File.Toml, 0644); err != nil {
+			log.Fatal("Error writing default config: ", err)
+		}
 	}
 
 	// Read config file into memory
@@ -119,6 +132,21 @@ func InitConfig() {
 
 func ReloadConfig() bool {
 	return readConfig(Args.Config, false)
+}
+
+func OnConfigChange(fun func()) {
+	configChangeMu.Lock()
+	configChangeCallbacks = append(configChangeCallbacks, fun)
+	configChangeMu.Unlock()
+}
+
+func notifyConfigChange() {
+	configChangeMu.Lock()
+	callbacks := append([]func(){}, configChangeCallbacks...)
+	configChangeMu.Unlock()
+	for _, fun := range callbacks {
+		fun()
+	}
 }
 
 func ConfigFolderPath(name string) string {
@@ -181,6 +209,62 @@ func readConfig(configFilePath string, initial bool) bool {
 }
 
 func validateConfig(config Configuration) error {
+	for i, entry := range config.WindowIgnore {
+		if len(entry) != 2 {
+			return fmt.Errorf("window_ignore entry %d must contain class and name regexes", i+1)
+		}
+		if _, err := regexp.Compile(entry[0]); err != nil {
+			return fmt.Errorf("window_ignore entry %d has invalid class regex: %w", i+1, err)
+		}
+		if entry[1] != "" {
+			if _, err := regexp.Compile(entry[1]); err != nil {
+				return fmt.Errorf("window_ignore entry %d has invalid name regex: %w", i+1, err)
+			}
+		}
+	}
+
+	for i, rule := range config.WindowRules {
+		if rule.Class == "" {
+			return fmt.Errorf("window_rules entry %d requires class", i+1)
+		}
+		classPattern, err := regexp.Compile(rule.Class)
+		if err != nil {
+			return fmt.Errorf("window_rules entry %d has invalid class regex: %w", i+1, err)
+		}
+		config.WindowRules[i].classPattern = classPattern
+		if rule.Name != "" {
+			namePattern, err := regexp.Compile(rule.Name)
+			if err != nil {
+				return fmt.Errorf("window_rules entry %d has invalid name regex: %w", i+1, err)
+			}
+			config.WindowRules[i].namePattern = namePattern
+		}
+		if rule.Tile && (rule.Floating || rule.Sticky) {
+			return fmt.Errorf("window_rules entry %d cannot combine tile with floating or sticky", i+1)
+		}
+		if rule.Monitor != nil && *rule.Monitor < 1 {
+			return fmt.Errorf("window_rules entry %d monitor must be at least 1", i+1)
+		}
+		if rule.Desktop != nil && *rule.Desktop < 1 {
+			return fmt.Errorf("window_rules entry %d desktop must be at least 1", i+1)
+		}
+		if rule.Sticky && rule.Desktop != nil {
+			return fmt.Errorf("window_rules entry %d cannot combine sticky with desktop", i+1)
+		}
+	}
+
+	for i, rule := range config.WorkspaceRules {
+		if rule.Desktop < 1 {
+			return fmt.Errorf("workspace_rules entry %d desktop must be at least 1", i+1)
+		}
+		if rule.Screen != nil && *rule.Screen < 1 {
+			return fmt.Errorf("workspace_rules entry %d screen must be at least 1", i+1)
+		}
+		if rule.Layout != "" && rule.Layout != "bsp" && rule.Layout != "maximized" && rule.Layout != "fullscreen" {
+			return fmt.Errorf("workspace_rules entry %d has invalid layout %q", i+1, rule.Layout)
+		}
+	}
+
 	for name, mode := range config.Modes {
 		if name == "" || name == "default" {
 			return fmt.Errorf("invalid key mode name %q", name)
@@ -194,25 +278,38 @@ func validateConfig(config Configuration) error {
 }
 
 func watchConfig(configFilePath string) {
-
-	// Init file watcher
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Error(err)
-	} else {
-		watcher.Add(configFilePath)
+		return
+	}
+	if err := watcher.Add(filepath.Dir(configFilePath)); err != nil {
+		log.Error(err)
+		watcher.Close()
+		return
 	}
 
-	// Listen for events
 	go func() {
+		defer watcher.Close()
+		var timer *time.Timer
+		schedule := func() {
+			if timer != nil {
+				timer.Stop()
+			}
+			timer = time.AfterFunc(100*time.Millisecond, notifyConfigChange)
+		}
+
 		for {
 			select {
 			case event, ok := <-watcher.Events:
 				if !ok {
 					return
 				}
-				if event.Has(fsnotify.Write) {
-					readConfig(configFilePath, false)
+				if filepath.Clean(event.Name) != filepath.Clean(configFilePath) {
+					continue
+				}
+				if event.Has(fsnotify.Write) || event.Has(fsnotify.Create) || event.Has(fsnotify.Rename) {
+					schedule()
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {

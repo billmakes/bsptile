@@ -142,11 +142,7 @@ func (c *Client) Fullscreen() bool {
 	if IsFullscreen(c.Latest) {
 		return false
 	}
-
-	// Fullscreen window
-	ewmh.WmStateReq(X, c.Window.Id, ewmh.StateAdd, "_NET_WM_STATE_FULLSCREEN")
-
-	return true
+	return RequestWindowState(c.Window.Id, ewmh.StateAdd, "_NET_WM_STATE_FULLSCREEN")
 }
 
 func (c *Client) UnFullscreen() bool {
@@ -154,10 +150,7 @@ func (c *Client) UnFullscreen() bool {
 		return false
 	}
 
-	// Unfullscreen window
-	ewmh.WmStateReq(X, c.Window.Id, ewmh.StateRemove, "_NET_WM_STATE_FULLSCREEN")
-
-	return true
+	return RequestWindowState(c.Window.Id, ewmh.StateRemove, "_NET_WM_STATE_FULLSCREEN")
 }
 
 func (c *Client) UnMaximize() bool {
@@ -165,23 +158,17 @@ func (c *Client) UnMaximize() bool {
 		return false
 	}
 
-	// Unmaximize window
-	ewmh.WmStateReq(X, c.Window.Id, ewmh.StateRemove, "_NET_WM_STATE_MAXIMIZED_VERT")
-	ewmh.WmStateReq(X, c.Window.Id, ewmh.StateRemove, "_NET_WM_STATE_MAXIMIZED_HORZ")
-
-	return true
+	return RequestWindowState(c.Window.Id, ewmh.StateRemove,
+		"_NET_WM_STATE_MAXIMIZED_VERT", "_NET_WM_STATE_MAXIMIZED_HORZ")
 }
 
 func (c *Client) MoveToDesktop(desktop uint32) bool {
 	if desktop == ^uint32(0) {
-		ewmh.WmStateReq(X, c.Window.Id, ewmh.StateAdd, "_NET_WM_STATE_STICKY")
+		if !RequestWindowState(c.Window.Id, ewmh.StateAdd, "_NET_WM_STATE_STICKY") {
+			return false
+		}
 	}
-
-	// Set client desktop
-	ewmh.WmDesktopSet(X, c.Window.Id, uint(desktop))
-	ewmh.ClientEvent(X, c.Window.Id, "_NET_WM_DESKTOP", int(desktop), int(2))
-
-	return true
+	return SetWindowDesktop(c.Window.Id, desktop)
 }
 
 func (c *Client) MoveToScreen(screen uint32) bool {
@@ -203,12 +190,7 @@ func (c *Client) MoveToScreenDirect(screen uint32) bool {
 	x, y := common.MaxInt(geom.Center().X-w/2, geom.X+100), common.MaxInt(geom.Center().Y-h/2, geom.Y+100)
 
 	// Move window
-	if err := ewmh.MoveWindow(X, c.Window.Id, x, y); err != nil {
-		log.Warn("Error moving window to screen: ", err)
-		return false
-	}
-
-	return true
+	return MoveXWindow(c.Window.Id, x, y)
 }
 
 func (c *Client) CenterOnScreen() bool {
@@ -222,11 +204,7 @@ func (c *Client) CenterOnScreen() bool {
 	x := geom.Center().X - w/2
 	y := geom.Center().Y - h/2
 	log.Info("Center window [", c.Latest.Class, "] to ", x, ",", y, " (screen ", screen, " center ", geom.Center(), ", size ", w, "x", h, ")")
-	if err := ewmh.MoveWindow(X, c.Window.Id, x, y); err != nil {
-		log.Warn("Error centering window: ", err)
-		return false
-	}
-	return true
+	return MoveXWindow(c.Window.Id, x, y)
 }
 
 func (c *Client) MoveWindow(x, y, w, h int) {
@@ -255,9 +233,9 @@ func (c *Client) MoveWindow(x, y, w, h int) {
 
 	// Move and/or resize window
 	if w > 0 && h > 0 {
-		ewmh.MoveresizeWindow(X, c.Window.Id, x+dx, y+dy, w-dw, h-dh)
+		MoveResizeXWindow(c.Window.Id, x+dx, y+dy, w-dw, h-dh)
 	} else {
-		ewmh.MoveWindow(X, c.Window.Id, x+dx, y+dy)
+		MoveXWindow(c.Window.Id, x+dx, y+dy)
 	}
 
 	// Update stored dimensions
@@ -405,17 +383,32 @@ func IsIgnored(info *Info) bool {
 
 	// Check ignored windows
 	for _, s := range common.Config.WindowIgnore {
+		if len(s) != 2 {
+			log.Warn("Skip malformed window_ignore entry")
+			continue
+		}
 		conf_class := s[0]
 		conf_name := s[1]
 
-		reg_class := regexp.MustCompile(strings.ToLower(conf_class))
-		reg_name := regexp.MustCompile(strings.ToLower(conf_name))
+		reg_class, err := regexp.Compile(strings.ToLower(conf_class))
+		if err != nil {
+			log.Warn("Skip invalid window_ignore class regex: ", err)
+			continue
+		}
 
 		// Ignore all windows with this class
 		class_match := reg_class.MatchString(strings.ToLower(info.Class))
 
 		// But allow the window with a special name
-		name_match := conf_name != "" && reg_name.MatchString(strings.ToLower(info.Name))
+		name_match := false
+		if conf_name != "" {
+			reg_name, err := regexp.Compile(strings.ToLower(conf_name))
+			if err != nil {
+				log.Warn("Skip invalid window_ignore name regex: ", err)
+				continue
+			}
+			name_match = reg_name.MatchString(strings.ToLower(info.Name))
+		}
 
 		if class_match && !name_match {
 			log.Info("Ignore window with ", strings.TrimSpace(strings.Join(s, " ")), " from config [", info.Class, "]")
@@ -470,11 +463,7 @@ func SetAbove(window xproto.Window) bool {
 	if IsAbove(info) {
 		return false
 	}
-	if err := ewmh.WmStateReq(X, window, ewmh.StateAdd, "_NET_WM_STATE_ABOVE"); err != nil {
-		log.Warn("Error setting window above [", info.Class, "]: ", err)
-		return false
-	}
-	return true
+	return RequestWindowState(window, ewmh.StateAdd, "_NET_WM_STATE_ABOVE")
 }
 
 func IsSticky(info *Info) bool {
@@ -486,27 +475,23 @@ func SetSticky(window xproto.Window) bool {
 	changed := false
 
 	if !IsSticky(info) {
-		if err := ewmh.WmStateReq(X, window, ewmh.StateAdd, "_NET_WM_STATE_STICKY"); err != nil {
-			log.Warn("Error setting window sticky [", info.Class, "]: ", err)
+		if !RequestWindowState(window, ewmh.StateAdd, "_NET_WM_STATE_STICKY") {
 			return false
 		}
 		changed = true
 	}
 
 	if !IsAbove(info) {
-		if err := ewmh.WmStateReq(X, window, ewmh.StateAdd, "_NET_WM_STATE_ABOVE"); err != nil {
-			log.Warn("Error setting sticky window above [", info.Class, "]: ", err)
+		if !RequestWindowState(window, ewmh.StateAdd, "_NET_WM_STATE_ABOVE") {
 			return changed
 		}
 		changed = true
 	}
 
 	desktop := ^uint32(0)
-	if err := ewmh.WmDesktopSet(X, window, uint(desktop)); err != nil {
-		log.Warn("Error assigning sticky window to all desktops [", info.Class, "]: ", err)
+	if !SetWindowDesktop(window, desktop) {
 		return changed
 	}
-	ewmh.ClientEvent(X, window, "_NET_WM_DESKTOP", int(desktop), int(2))
 	return changed
 }
 

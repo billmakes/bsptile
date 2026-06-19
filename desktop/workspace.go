@@ -30,12 +30,9 @@ func CreateWorkspaces() map[store.Location]*Workspace {
 				Name:     fmt.Sprintf("workspace-%d-%d", location.Desktop, location.Screen),
 				Location: location,
 				Layouts:  CreateLayouts(location),
-				Layout:   0,
-				Tiling:   common.Config.TilingEnabled,
 			}
 
-			// Apply matching workspace_rule on top of the global defaults.
-			applyWorkspaceRule(ws, common.MatchWorkspaceRule(desktop, screen))
+			ws.ApplyConfig()
 
 			// Map location to workspace
 			workspaces[location] = ws
@@ -43,6 +40,15 @@ func CreateWorkspaces() map[store.Location]*Workspace {
 	}
 
 	return workspaces
+}
+
+func (ws *Workspace) ApplyConfig() {
+	ws.Tiling = common.Config.TilingEnabled
+	ws.Layout = 0
+	for _, layout := range ws.Layouts {
+		layout.GetManager().Decoration = common.Config.WindowDecoration
+	}
+	applyWorkspaceRule(ws, common.MatchWorkspaceRule(ws.Location.Desktop, ws.Location.Screen))
 }
 
 func applyWorkspaceRule(ws *Workspace, rule *common.WorkspaceRule) {

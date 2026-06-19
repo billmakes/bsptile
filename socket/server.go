@@ -6,9 +6,11 @@ package socket
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
+	"syscall"
 
 	"golang.org/x/exp/maps"
 
@@ -46,12 +48,7 @@ func Init(tr *desktop.Tracker) (*Server, error) {
 		path = proto.SocketPath()
 	}
 
-	// Stale socket from a previous run blocks Listen; remove it first.
-	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-		log.Warn("Error removing stale socket: ", err)
-	}
-
-	l, err := net.Listen("unix", path)
+	l, err := listenControlSocket(path)
 	if err != nil {
 		return nil, err
 	}
@@ -132,28 +129,42 @@ func (s *Server) handleAction(conn net.Conn, req proto.Request) {
 	if mod == "" {
 		mod = "current"
 	}
+	if !validActionModifier(mod) {
+		writeResponse(conn, proto.Response{Error: "invalid action modifier: " + mod})
+		return
+	}
 	ok := input.ExecuteActions(req.Name, s.Tracker, mod)
 	writeResponse(conn, proto.Response{OK: ok})
 }
 
+func validActionModifier(mod string) bool {
+	return mod == "current" || mod == "screens" || mod == "workspaces"
+}
+
 func (s *Server) handleQuery(conn net.Conn, req proto.Request) {
 	target := req.Target
-	if target == "" {
-		writeResponse(conn, proto.Response{OK: true, Data: map[string]interface{}{
-			proto.QueryWorkspaces: maps.Values(s.Tracker.Workspaces),
-			proto.QueryWindows:    store.Windows,
-			proto.QueryClients:    maps.Values(s.Tracker.Clients),
-			proto.QueryWorkplace:  store.Workplace,
-			proto.QueryConfig:     common.Config,
-		}})
-		return
-	}
-	data := s.payloadForTopic(target)
+	var data interface{}
+	s.Tracker.Call(func() {
+		data = s.queryPayload(target)
+	})
 	if data == nil {
 		writeResponse(conn, proto.Response{Error: "unknown query target: " + target})
 		return
 	}
 	writeResponse(conn, proto.Response{OK: true, Data: data})
+}
+
+func (s *Server) queryPayload(target string) interface{} {
+	if target == "" {
+		return map[string]interface{}{
+			proto.QueryWorkspaces: maps.Values(s.Tracker.Workspaces),
+			proto.QueryWindows:    store.Windows,
+			proto.QueryClients:    maps.Values(s.Tracker.Clients),
+			proto.QueryWorkplace:  store.Workplace,
+			proto.QueryConfig:     common.Config,
+		}
+	}
+	return s.payloadForTopic(target)
 }
 
 // payloadForTopic returns the live snapshot used both for query responses
@@ -210,10 +221,10 @@ func (s *Server) handleWM(conn net.Conn, req proto.Request) {
 	switch req.Op {
 	case proto.WMRestart:
 		writeResponse(conn, proto.Response{OK: true})
-		input.Restart(s.Tracker)
+		input.ExecuteActiveAction("restart", s.Tracker)
 	case proto.WMExit:
 		writeResponse(conn, proto.Response{OK: true})
-		input.Exit(s.Tracker)
+		input.ExecuteActiveAction("exit", s.Tracker)
 	default:
 		writeResponse(conn, proto.Response{Error: "unknown wm op: " + req.Op})
 	}
@@ -225,9 +236,69 @@ func (s *Server) Close() {
 	if s.listener != nil {
 		s.listener.Close()
 	}
-	if s.Path != "" {
-		os.Remove(s.Path)
+	if s.subs != nil {
+		s.subs.Close()
 	}
+	if s.Path != "" {
+		if err := removeOwnedSocket(s.Path); err != nil {
+			log.Warn("Error removing control socket: ", err)
+		}
+	}
+}
+
+func listenControlSocket(path string) (net.Listener, error) {
+	if err := removeStaleSocket(path); err != nil {
+		return nil, err
+	}
+	listener, err := net.Listen("unix", path)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.Chmod(path, 0600); err != nil {
+		listener.Close()
+		os.Remove(path)
+		return nil, fmt.Errorf("secure control socket: %w", err)
+	}
+	return listener, nil
+}
+
+func removeStaleSocket(path string) error {
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("inspect control socket: %w", err)
+	}
+	if info.Mode()&os.ModeSocket == 0 {
+		return fmt.Errorf("refusing to remove non-socket control path %s", path)
+	}
+	if !ownedByCurrentUser(info) {
+		return fmt.Errorf("refusing to remove control socket not owned by uid %d: %s", os.Geteuid(), path)
+	}
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("remove stale control socket: %w", err)
+	}
+	return nil
+}
+
+func removeOwnedSocket(path string) error {
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSocket == 0 || !ownedByCurrentUser(info) {
+		return nil
+	}
+	return os.Remove(path)
+}
+
+func ownedByCurrentUser(info os.FileInfo) bool {
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	return ok && stat.Uid == uint32(os.Geteuid())
 }
 
 func writeResponse(conn net.Conn, resp proto.Response) error {

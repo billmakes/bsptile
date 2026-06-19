@@ -118,6 +118,7 @@ func CreateXWindow(w xproto.Window) *XWindow {
 var (
 	stateCallbacksFun   []func(string, uint, uint)   // State events callback functions
 	pointerCallbacksFun []func(XPointer, uint, uint) // Pointer events callback functions
+	stateDispatcher     = func(fun func()) { fun() }
 )
 
 func InitRoot() {
@@ -147,7 +148,19 @@ func InitRoot() {
 	// Attach root events
 	root := CreateXWindow(X.RootWin())
 	root.Instance.Listen(xproto.EventMaskSubstructureNotify | xproto.EventMaskPropertyChange)
-	xevent.PropertyNotifyFun(StateUpdate).Connect(X, root.Id)
+	xevent.PropertyNotifyFun(func(X *xgbutil.XUtil, event xevent.PropertyNotifyEvent) {
+		stateDispatcher(func() {
+			StateUpdate(X, event)
+		})
+	}).Connect(X, root.Id)
+}
+
+func SetStateDispatcher(dispatch func(func())) {
+	if dispatch == nil {
+		stateDispatcher = func(fun func()) { fun() }
+		return
+	}
+	stateDispatcher = dispatch
 }
 
 func Connected() bool {
@@ -177,10 +190,10 @@ func Connected() bool {
 		}
 		WindowManager = &XWindowManager{Name: name}
 
-		// Validate ROOT properties
-		_, err = ewmh.ClientListStackingGet(X)
-		if err != nil {
-			log.Error("Error retrieving ROOT properties: ", err)
+		// Validate root client-list support. Some EWMH window managers publish
+		// _NET_CLIENT_LIST but omit the optional stacking-order property.
+		if _, err = clientListGet(X); err != nil {
+			log.Error("Error retrieving ROOT client list: ", err)
 			continue
 		}
 
@@ -230,9 +243,9 @@ func CurrentDesktopGet(X *xgbutil.XUtil) uint {
 }
 
 func CurrentDesktopSet(X *xgbutil.XUtil, desktop uint) {
-	ewmh.CurrentDesktopSet(X, desktop)
-	ewmh.ClientEvent(X, X.RootWin(), "_NET_CURRENT_DESKTOP", int(desktop), int(0))
-	Workplace.CurrentDesktop = desktop
+	if SetCurrentDesktop(desktop) {
+		Workplace.CurrentDesktop = desktop
+	}
 }
 
 func ActiveWindowGet(X *xgbutil.XUtil) XWindow {
@@ -262,8 +275,7 @@ func ActiveWindowSet(X *xgbutil.XUtil, w *XWindow) {
 	if X == nil || w == nil {
 		return
 	}
-	if err := ewmh.ActiveWindowReq(X, w.Id); err != nil {
-		log.Warn("Error requesting active window: ", err)
+	if !RequestActiveWindow(w.Id) {
 		return
 	}
 	ActiveWindowUpdate(w)
@@ -274,7 +286,7 @@ func ActiveWindowUpdate(w *XWindow) {
 }
 
 func ClientListStackingGet(X *xgbutil.XUtil) []XWindow {
-	clients, err := ewmh.ClientListStackingGet(X)
+	clients, err := clientListGet(X)
 
 	// Validate client list
 	if err != nil {
@@ -289,6 +301,14 @@ func ClientListStackingGet(X *xgbutil.XUtil) []XWindow {
 	}
 
 	return windows
+}
+
+func clientListGet(X *xgbutil.XUtil) ([]xproto.Window, error) {
+	clients, err := ewmh.ClientListStackingGet(X)
+	if err == nil {
+		return clients, nil
+	}
+	return ewmh.ClientListGet(X)
 }
 
 func WindowAt(X *xgbutil.XUtil, p common.Point, desktop uint) (XWindow, bool) {
@@ -601,7 +621,7 @@ func StateUpdate(X *xgbutil.XUtil, e xevent.PropertyNotifyEvent) {
 		Workplace.CurrentDesktop = CurrentDesktopGet(X)
 	} else if common.IsInList(aname, []string{"_NET_DESKTOP_LAYOUT", "_NET_DESKTOP_GEOMETRY", "_NET_DESKTOP_VIEWPORT", "_NET_WORKAREA"}) {
 		Workplace.Displays = DisplaysGet(X)
-	} else if common.IsInList(aname, []string{"_NET_CLIENT_LIST_STACKING"}) {
+	} else if common.IsInList(aname, []string{"_NET_CLIENT_LIST_STACKING", "_NET_CLIENT_LIST"}) {
 		Windows.Stacked = ClientListStackingGet(X)
 	} else if common.IsInList(aname, []string{"_NET_ACTIVE_WINDOW"}) {
 		Windows.Active = ActiveWindowGet(X)

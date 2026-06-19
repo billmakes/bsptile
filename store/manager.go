@@ -153,13 +153,6 @@ func (mg *Manager) InsertClient(source, target *Client, edge string) {
 	if source == nil || target == nil || source == target {
 		return
 	}
-	if mg.node(source) != nil {
-		mg.RemoveClient(source)
-	}
-	targetLeaf := mg.node(target)
-	if targetLeaf == nil {
-		return
-	}
 	var split string
 	sourceFirst := false
 	switch edge {
@@ -172,6 +165,16 @@ func (mg *Manager) InsertClient(source, target *Client, edge string) {
 	case "bottom":
 		split, sourceFirst = SplitHorizontal, false
 	default:
+		return
+	}
+	if mg.node(target) == nil {
+		return
+	}
+	if mg.node(source) != nil {
+		mg.RemoveClient(source)
+	}
+	targetLeaf := mg.node(target)
+	if targetLeaf == nil {
 		return
 	}
 	log.Info("Insert BSP leaf [", source.Latest.Class, " ", edge, " of ", target.Latest.Class, ", ", mg.Name, "]")

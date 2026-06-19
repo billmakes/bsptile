@@ -33,8 +33,7 @@ func (l *MaximizedLayout) Apply() {
 		return
 	}
 
-	dx, dy, dw, dh := store.DesktopGeometry(l.Location.Screen).Pieces()
-	gap := common.Config.WindowGapSize
+	target := MaximizedGeometry(*store.DesktopGeometry(l.Location.Screen), common.Config.WindowGapSize)
 
 	log.Info("Tile active window with ", l.Name, " layout [workspace-", l.Location.Desktop, "-", l.Location.Screen, "]")
 
@@ -45,10 +44,21 @@ func (l *MaximizedLayout) Apply() {
 		}
 	}
 
-	minw := int(math.Round(float64(dw - 2*gap)))
-	minh := int(math.Round(float64(dh - 2*gap)))
+	minw := int(math.Round(float64(target.Width)))
+	minh := int(math.Round(float64(target.Height)))
 	active.Limit(minw, minh)
-	active.MoveWindow(dx+gap, dy+gap, dw-2*gap, dh-2*gap)
+	active.MoveWindow(target.X, target.Y, target.Width, target.Height)
+}
+
+func MaximizedGeometry(desktop common.Geometry, gap int) common.Geometry {
+	width := common.MaxInt(desktop.Width-2*gap, 1)
+	height := common.MaxInt(desktop.Height-2*gap, 1)
+	return common.Geometry{
+		X:      desktop.X + gap,
+		Y:      desktop.Y + gap,
+		Width:  width,
+		Height: height,
+	}
 }
 
 func (l *MaximizedLayout) UpdateProportions(c *store.Client, d *store.Directions, geom common.Geometry) {

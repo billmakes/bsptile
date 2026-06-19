@@ -24,6 +24,11 @@ var (
 )
 
 func Bind(tr *desktop.Tracker) {
+	common.OnConfigChange(func() {
+		tr.Post(func() {
+			ReloadConfig(tr)
+		})
+	})
 	BindSignal(tr)
 	BindMouse(tr)
 	BindKeys(tr)
@@ -33,6 +38,30 @@ func Bind(tr *desktop.Tracker) {
 }
 
 func ExecuteAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) bool {
+	success := false
+	tr.Call(func() {
+		success = executeAction(action, tr, ws)
+	})
+	return success
+}
+
+func ExecuteActiveAction(action string, tr *desktop.Tracker) bool {
+	success := false
+	tr.Call(func() {
+		success = executeAction(action, tr, tr.ActiveWorkspace())
+	})
+	return success
+}
+
+func ExecuteActionAt(action string, tr *desktop.Tracker, desktop uint, screen uint) bool {
+	success := false
+	tr.Call(func() {
+		success = executeAction(action, tr, tr.WorkspaceAt(desktop, screen))
+	})
+	return success
+}
+
+func executeAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) bool {
 	success := false
 	if len(action) == 0 || tr == nil || ws == nil {
 		return false
@@ -46,88 +75,9 @@ func ExecuteAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) bo
 		success = SetKeyMode(mode, tr)
 		goto complete
 	}
-	switch action {
-	case "enable":
-		success = EnableTiling(tr, ws)
-	case "disable":
-		success = DisableTiling(tr, ws)
-	case "toggle":
-		success = ToggleTiling(tr, ws)
-	case "decoration":
-		success = ToggleDecoration(tr, ws)
-	case "restore":
-		success = Restore(tr, ws)
-	case "reset":
-		success = Reset(tr, ws)
-	case "balance":
-		success = Balance(tr, ws)
-	case "tree_rotate":
-		success = RotateTree(tr, ws)
-	case "layout_bsp":
-		success = BSPLayout(tr, ws)
-	case "layout_maximized":
-		success = MaximizedLayout(tr, ws)
-	case "layout_fullscreen":
-		success = FullscreenLayout(tr, ws)
-	case "window_next":
-		success = NextWindow(tr, ws)
-	case "window_previous":
-		success = PreviousWindow(tr, ws)
-	case "window_up":
-		success = DirectionWindow(tr, ws, common.Up)
-	case "window_down":
-		success = DirectionWindow(tr, ws, common.Down)
-	case "window_left":
-		success = DirectionWindow(tr, ws, common.Left)
-	case "window_right":
-		success = DirectionWindow(tr, ws, common.Right)
-	case "move_window_up":
-		success = MoveDirectionWindow(tr, ws, common.Up)
-	case "move_window_down":
-		success = MoveDirectionWindow(tr, ws, common.Down)
-	case "move_window_left":
-		success = MoveDirectionWindow(tr, ws, common.Left)
-	case "move_window_right":
-		success = MoveDirectionWindow(tr, ws, common.Right)
-	case "position_next":
-		success = NextPosition(tr, ws)
-	case "position_previous":
-		success = PreviousPosition(tr, ws)
-	case "screen_next":
-		success = NextScreen(tr, ws)
-	case "screen_previous":
-		success = PreviousScreen(tr, ws)
-	case "window_to_desktop_next":
-		success = NextDesktop(tr, ws)
-	case "window_to_desktop_previous":
-		success = PreviousDesktop(tr, ws)
-	case "proportion_increase":
-		success = IncreaseProportion(tr, ws)
-	case "proportion_decrease":
-		success = DecreaseProportion(tr, ws)
-	case "resize_left":
-		success = Resize(tr, ws, common.Left)
-	case "resize_right":
-		success = Resize(tr, ws, common.Right)
-	case "resize_up":
-		success = Resize(tr, ws, common.Up)
-	case "resize_down":
-		success = Resize(tr, ws, common.Down)
-	case "proportion_up":
-		success = DirectionProportion(tr, ws, common.Up)
-	case "proportion_down":
-		success = DirectionProportion(tr, ws, common.Down)
-	case "proportion_left":
-		success = DirectionProportion(tr, ws, common.Left)
-	case "proportion_right":
-		success = DirectionProportion(tr, ws, common.Right)
-	case "reload":
-		success = ReloadConfig(tr)
-	case "restart":
-		success = Restart(tr)
-	case "exit":
-		success = Exit(tr)
-	default:
+	if spec, ok := LookupAction(action); ok {
+		success = spec.Handler(tr, ws)
+	} else {
 		if handled, ok := tryNumberedAction(action, tr, ws); ok {
 			success = handled
 		} else {
@@ -136,7 +86,9 @@ func ExecuteAction(action string, tr *desktop.Tracker, ws *desktop.Workspace) bo
 	}
 
 complete:
-	time.AfterFunc(100*time.Millisecond, tr.Handlers.Reset)
+	time.AfterFunc(100*time.Millisecond, func() {
+		tr.Post(tr.Handlers.Reset)
+	})
 
 	// Check success
 	if !success {
@@ -150,6 +102,14 @@ complete:
 }
 
 func ExecuteActions(action string, tr *desktop.Tracker, mod string) bool {
+	success := false
+	tr.Call(func() {
+		success = executeActions(action, tr, mod)
+	})
+	return success
+}
+
+func executeActions(action string, tr *desktop.Tracker, mod string) bool {
 	client := tr.ClientWorkspace(tr.RefreshActiveClient())
 	active := tr.ActiveWorkspace()
 
@@ -173,7 +133,7 @@ func ExecuteActions(action string, tr *desktop.Tracker, mod string) bool {
 		}
 
 		// Execute action and store results
-		success := ExecuteAction(action, tr, ws)
+		success := executeAction(action, tr, ws)
 		results = append(results, success)
 	}
 
@@ -688,7 +648,7 @@ func PreviousScreen(tr *desktop.Tracker, ws *desktop.Workspace) bool {
 }
 
 func NextDesktop(tr *desktop.Tracker, ws *desktop.Workspace) bool {
-	c := tr.ActiveClient()
+	c := activeSendCandidate(tr)
 	if c == nil {
 		return false
 	}
@@ -700,7 +660,7 @@ func NextDesktop(tr *desktop.Tracker, ws *desktop.Workspace) bool {
 }
 
 func PreviousDesktop(tr *desktop.Tracker, ws *desktop.Workspace) bool {
-	c := tr.ActiveClient()
+	c := activeSendCandidate(tr)
 	if c == nil {
 		return false
 	}
@@ -709,6 +669,22 @@ func PreviousDesktop(tr *desktop.Tracker, ws *desktop.Workspace) bool {
 		return false
 	}
 	return MoveWindowToDesktop(tr, c, uint32(prev))
+}
+
+// activeSendCandidate returns the client to use for cross-desktop sends.
+// Tracked clients are preferred, but on workspaces with tiling disabled the
+// tracker deliberately skips Update(), so tr.ActiveClient() is nil. In that
+// case we wrap the EWMH active window in a transient Client — enough to read
+// its current desktop and write _NET_WM_DESKTOP, no BSP-tree role.
+func activeSendCandidate(tr *desktop.Tracker) *store.Client {
+	if c := tr.ActiveClient(); c != nil {
+		return c
+	}
+	id := store.Windows.Active.Id
+	if id == 0 {
+		return nil
+	}
+	return store.CreateClient(id)
 }
 
 // MoveWindowToDesktop sends c to the given 0-indexed desktop on the same
@@ -739,7 +715,7 @@ func tryNumberedAction(action string, tr *desktop.Tracker, ws *desktop.Workspace
 	if err != nil || n < 1 {
 		return false, false
 	}
-	return MoveWindowToDesktop(tr, tr.ActiveClient(), uint32(n-1)), true
+	return MoveWindowToDesktop(tr, activeSendCandidate(tr), uint32(n-1)), true
 }
 
 func MoveWindowToScreen(tr *desktop.Tracker, c *store.Client, screen uint32) bool {
@@ -772,29 +748,38 @@ func MoveWindowToScreen(tr *desktop.Tracker, c *store.Client, screen uint32) boo
 
 	store.ActiveWindowSet(store.X, c.Window)
 	if movePointer {
-		movePointerToClientScreen(c, uint(screen))
+		movePointerToClientScreen(tr, c, uint(screen))
 	}
 
 	return true
 }
 
-func movePointerToClientScreen(c *store.Client, screen uint) {
+func movePointerToClientScreen(tr *desktop.Tracker, c *store.Client, screen uint) {
 	go func() {
 		var previous common.Point
 		stable := 0
 
 		for range 20 {
 			time.Sleep(50 * time.Millisecond)
-			if c.Latest.Location.Screen != screen {
+			var center common.Point
+			onScreen := false
+			valid := false
+			tr.Call(func() {
+				if c.Latest.Location.Screen != screen {
+					return
+				}
+				onScreen = true
+				rect, err := c.Window.Instance.DecorGeometry()
+				if err != nil {
+					return
+				}
+				center = common.CreateGeometry(rect).Center()
+				valid = store.ScreenGet(center) == screen
+			})
+			if !onScreen {
 				return
 			}
-
-			rect, err := c.Window.Instance.DecorGeometry()
-			if err != nil {
-				continue
-			}
-			center := common.CreateGeometry(rect).Center()
-			if store.ScreenGet(center) != screen {
+			if !valid {
 				stable = 0
 				continue
 			}
@@ -806,7 +791,9 @@ func movePointerToClientScreen(c *store.Client, screen uint) {
 				stable = 0
 			}
 			if stable >= 2 {
-				store.PointerMove(store.X, center)
+				tr.Post(func() {
+					store.PointerMove(store.X, center)
+				})
 				return
 			}
 		}
@@ -870,12 +857,16 @@ func ReloadConfig(tr *desktop.Tracker) bool {
 	ReloadMouseBindings(tr)
 
 	for _, ws := range tr.Workspaces {
-		for _, layout := range ws.Layouts {
-			layout.GetManager().Decoration = common.Config.WindowDecoration
+		wasEnabled := ws.TilingEnabled()
+		ws.ApplyConfig()
+		if wasEnabled && ws.TilingDisabled() {
+			tr.Restore(ws, store.Latest)
 		}
-		if ws.TilingEnabled() {
-			tr.Tile(ws)
-		}
+	}
+
+	tr.Update()
+	for _, ws := range tr.Workspaces {
+		tr.Tile(ws)
 	}
 
 	log.Info("Reload config")
