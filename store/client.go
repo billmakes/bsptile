@@ -54,6 +54,7 @@ type Hints struct {
 const (
 	Original uint8 = 1 // Flag to restore original info
 	Latest   uint8 = 2 // Flag to restore latest info
+	Natural  uint8 = 3 // Flag to restore latest position with original size
 )
 
 func CreateClient(w xproto.Window) *Client {
@@ -269,6 +270,8 @@ func (c *Client) OuterGeometry() (x, y, w, h int) {
 func (c *Client) Restore(flag uint8) {
 	if flag == Latest {
 		c.Update()
+	} else if flag == Natural {
+		c.Update()
 	}
 
 	// Restore window sizes
@@ -292,13 +295,32 @@ func (c *Client) Restore(flag uint8) {
 		c.Latest.Dimensions.AdjSize = false
 	}
 
-	// Move window to restore position
-	geom := c.Latest.Dimensions.Geometry
-	switch flag {
-	case Original:
-		geom = c.Original.Dimensions.Geometry
-	}
+	// Move window to restore position/size.
+	geom := c.RestoreGeometry(flag)
 	c.MoveWindow(geom.X, geom.Y, geom.Width, geom.Height)
+}
+
+func (c *Client) RestoreGeometry(flag uint8) common.Geometry {
+	latest := c.Latest.Dimensions.Geometry
+	if flag == Original {
+		return c.Original.Dimensions.Geometry
+	}
+	if flag != Natural {
+		return latest
+	}
+
+	natural := c.Original.Dimensions.Geometry
+	if natural.Width <= 0 || natural.Height <= 0 {
+		return latest
+	}
+
+	center := latest.Center()
+	return common.Geometry{
+		X:      center.X - natural.Width/2,
+		Y:      center.Y - natural.Height/2,
+		Width:  natural.Width,
+		Height: natural.Height,
+	}
 }
 
 func (c *Client) Update() {

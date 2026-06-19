@@ -158,7 +158,7 @@ func DisableTiling(tr *desktop.Tracker, ws *desktop.Workspace) bool {
 		return false
 	}
 	ws.DisableTiling()
-	tr.Restore(ws, store.Latest)
+	tr.Restore(ws, store.Natural)
 
 	ui.ShowLayout(ws)
 	ui.UpdateIcon(ws)
@@ -490,7 +490,7 @@ func moveDirectionAcrossScreens(tr *desktop.Tracker, source *desktop.Workspace, 
 	if target.TilingEnabled() {
 		tr.Tile(target)
 	} else {
-		active.Restore(store.Latest)
+		active.Restore(store.Natural)
 	}
 
 	store.ActiveWindowSet(store.X, active.Window)
@@ -828,7 +828,7 @@ func MoveWindowToScreen(tr *desktop.Tracker, c *store.Client, screen uint32) boo
 	if target.TilingEnabled() {
 		tr.Tile(target)
 	} else {
-		c.Restore(store.Latest)
+		c.Restore(store.Natural)
 	}
 
 	store.ActiveWindowSet(store.X, c.Window)
@@ -942,7 +942,7 @@ func ReloadConfig(tr *desktop.Tracker) bool {
 		wasEnabled := ws.TilingEnabled()
 		ws.ApplyConfig()
 		if wasEnabled && ws.TilingDisabled() {
-			tr.Restore(ws, store.Latest)
+			tr.Restore(ws, store.Natural)
 		}
 	}
 
@@ -963,7 +963,7 @@ func Restart(tr *desktop.Tracker) bool {
 			continue
 		}
 		ws.DisableTiling()
-		tr.Restore(ws, store.Latest)
+		tr.Restore(ws, store.Natural)
 	}
 
 	log.Info("Restart")
@@ -985,7 +985,7 @@ func Exit(tr *desktop.Tracker) bool {
 			continue
 		}
 		ws.DisableTiling()
-		tr.Restore(ws, store.Latest)
+		tr.Restore(ws, store.Natural)
 	}
 
 	log.Info("Exit")

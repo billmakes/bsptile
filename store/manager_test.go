@@ -64,6 +64,23 @@ func TestFloatingClassification(t *testing.T) {
 	}
 }
 
+func TestNaturalRestoreGeometryKeepsLatestCenterAndOriginalSize(t *testing.T) {
+	client := &Client{
+		Original: &Info{Dimensions: Dimensions{Geometry: common.Geometry{
+			X: 10, Y: 20, Width: 320, Height: 180,
+		}}},
+		Latest: &Info{Dimensions: Dimensions{Geometry: common.Geometry{
+			X: 100, Y: 100, Width: 800, Height: 600,
+		}}},
+	}
+
+	got := client.RestoreGeometry(Natural)
+	want := common.Geometry{X: 340, Y: 310, Width: 320, Height: 180}
+	if got != want {
+		t.Fatalf("natural restore geometry = %+v, want %+v", got, want)
+	}
+}
+
 func TestBSPInsertSplitsLongestSide(t *testing.T) {
 	mg := CreateBSPManager(Location{})
 	first := testClient(1)

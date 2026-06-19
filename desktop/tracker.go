@@ -457,8 +457,8 @@ func (tr *Tracker) untrackWindow(w xproto.Window) bool {
 	// Detach events
 	xevent.Detach(store.X, w)
 
-	// Restore client
-	c.Restore(store.Latest)
+	// Restore client to the app-requested size before releasing ownership.
+	c.Restore(store.Natural)
 
 	// Remove client
 	ws.RemoveClient(c)
@@ -722,7 +722,7 @@ func (tr *Tracker) handleWorkspaceChange(h *Handler) {
 	if ws.TilingEnabled() {
 		tr.Tile(ws)
 	} else {
-		c.Restore(store.Latest)
+		c.Restore(store.Natural)
 	}
 
 	// Reset screen swapping handler
