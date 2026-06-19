@@ -57,14 +57,9 @@ Run the daemon manually:
 bsptile
 ```
 
-### Service
-To enable auto tiling on startup, run bsptile as a systemd user service.
-A template is provided in the [services](https://github.com/billmakes/bsptile/tree/main/assets/services) folder:
-```bash
-cp assets/services/bsptile.service ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now bsptile.service
-```
+To start bsptile on login, drop a one-line launcher into your desktop's
+autostart mechanism (xfce: **Session and Startup → Application Autostart**;
+or write a `.desktop` file in `~/.config/autostart/`).
 
 ## Usage
 Tiling uses a binary space partitioning tree. Every window is a leaf, and
@@ -77,7 +72,7 @@ split ratio.
 ## Configuration
 The configuration file is at `~/.config/bsptile/config.toml` (or
 `$XDG_CONFIG_HOME`) and is created with default values on first startup.
-See [config.toml](https://github.com/billmakes/bsptile/blob/main/config.toml) for all available options.
+See [config.toml](https://github.com/billmakes/bsptile/blob/master/config.toml) for all available options.
 
 A few selected knobs:
 
@@ -106,7 +101,7 @@ button12
     bsptilectl action layout_maximized
 ```
 
-The example [`assets/sxhkdrc.example`](https://github.com/billmakes/bsptile/blob/main/assets/sxhkdrc.example)
+The example [`assets/sxhkdrc.example`](https://github.com/billmakes/bsptile/blob/master/assets/sxhkdrc.example)
 is a complete sxhkd profile with regular desktop hotkeys, media keys, bsptile
 actions, workspace sends, resize chords, and commented high mouse-button
 examples.
@@ -220,7 +215,7 @@ Desktop-related actions are split intentionally:
   without moving the active window.
 
 A sample sxhkd file that drives bsptile entirely through `bsptilectl` is at
-[`assets/sxhkdrc.example`](https://github.com/billmakes/bsptile/blob/main/assets/sxhkdrc.example).
+[`assets/sxhkdrc.example`](https://github.com/billmakes/bsptile/blob/master/assets/sxhkdrc.example).
 
 ### D-Bus
 The daemon also exports its properties and methods via D-Bus for legacy and
@@ -252,4 +247,4 @@ Run in verbose mode:
 - [bspwm](https://github.com/baskerville/bspwm) by **baskerville** — the spiritual model for the BSP semantics, the `bspc`/socket control-plane design, and the window-rule grammar that this project carries.
 
 ## License
-[MIT](https://github.com/billmakes/bsptile/blob/main/LICENSE)
+[MIT](https://github.com/billmakes/bsptile/blob/master/LICENSE)
