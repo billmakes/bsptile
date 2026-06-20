@@ -597,9 +597,6 @@ func FrameExtents(net, gtk []uint) ewmh.FrameExtents {
 			break
 		}
 		values[i] -= int(e)
-		if values[i] < 0 {
-			values[i] = 0
-		}
 	}
 
 	return ewmh.FrameExtents{

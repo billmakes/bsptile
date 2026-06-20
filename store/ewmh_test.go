@@ -20,10 +20,10 @@ func TestWindowStateActionName(t *testing.T) {
 	}
 }
 
-func TestFrameExtentsClampsGtkSubtraction(t *testing.T) {
+func TestFrameExtentsPreservesGtkSubtraction(t *testing.T) {
 	got := FrameExtents([]uint{1, 2, 3, 4}, []uint{3, 1, 10, 2})
-	if got.Left != 0 || got.Right != 1 || got.Top != 0 || got.Bottom != 2 {
-		t.Fatalf("FrameExtents = %+v, want clamped signed subtraction", got)
+	if got.Left != -2 || got.Right != 1 || got.Top != -7 || got.Bottom != 2 {
+		t.Fatalf("FrameExtents = %+v, want signed subtraction", got)
 	}
 }
 

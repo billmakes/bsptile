@@ -896,7 +896,7 @@ func (tr *Tracker) attachHandlers(c *store.Client) {
 				tr.handleMinimizedClient(c)
 			} else if aname == "_NET_WM_DESKTOP" {
 				tr.handleWorkspaceChange(&Handler{Source: c, Target: tr.ActiveWorkspace()})
-			} else if aname == "_NET_FRAME_EXTENTS" {
+			} else if aname == "_NET_FRAME_EXTENTS" || aname == "_GTK_FRAME_EXTENTS" {
 				ws := tr.ClientWorkspace(c)
 				if ws != nil && ws.TilingEnabled() && tr.isTracked(c.Window.Id) {
 					old := c.Latest.Dimensions.Extents
